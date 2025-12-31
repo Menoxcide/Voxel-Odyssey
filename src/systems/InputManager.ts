@@ -131,17 +131,39 @@ export class InputManager {
     }
 
     if (shootBtn) {
+      // Track shoot button touch separately for multi-touch support
+      let shootTouchId: number | null = null;
+
       shootBtn.addEventListener('touchstart', (e: TouchEvent) => {
         e.preventDefault();
-        if (this.shouldProcessInput()) {
+        e.stopPropagation();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          shootTouchId = e.changedTouches[i].identifier;
           this.state.shooting = true;
+          break;
         }
       }, { passive: false });
 
       shootBtn.addEventListener('touchend', (e: TouchEvent) => {
         e.preventDefault();
-        this.state.shooting = false;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === shootTouchId) {
+            shootTouchId = null;
+            this.state.shooting = false;
+            break;
+          }
+        }
       }, { passive: false });
+
+      shootBtn.addEventListener('touchcancel', (e: TouchEvent) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === shootTouchId) {
+            shootTouchId = null;
+            this.state.shooting = false;
+            break;
+          }
+        }
+      }, { passive: true });
     }
 
     // Right side touch drag for camera rotation
@@ -179,9 +201,9 @@ export class InputManager {
           const deltaX = touch.clientX - lastTouchX;
           const deltaY = touch.clientY - lastTouchY;
 
-          // Rotate camera - matches finger movement speed
-          // Swipe across half the screen width = 90 degree turn
-          const sensitivity = 0.002;
+          // Rotate camera - very low sensitivity for precise control
+          // Full screen swipe = ~60 degree turn
+          const sensitivity = 0.0008;
           this.state.aimX += deltaX * sensitivity;
           this.state.aimY = Math.max(
             -Math.PI / 4,
