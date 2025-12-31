@@ -1,6 +1,12 @@
 // Voxel Odyssey - Global Styles
 // Mobile-first, fullscreen canvas game
 
+// CSS custom property for actual viewport height (set by JS)
+:root {
+  --vh: 1vh;
+  --app-height: 100vh;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -11,6 +17,7 @@ html,
 body {
   width: 100%;
   height: 100%;
+  height: var(--app-height, 100vh);
   overflow: hidden;
   background-color: #1a1a2e;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -29,7 +36,10 @@ body {
   top: 0;
   left: 0;
   width: 100vw;
+  // Use dynamic viewport height with fallbacks
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100vh);
   display: block;
 
   // Critical for mobile touch
@@ -49,6 +59,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100vh);
   pointer-events: none;
   z-index: 10;
 
@@ -63,6 +75,7 @@ body {
   position: absolute;
   left: 0;
   bottom: 0;
+  bottom: env(safe-area-inset-bottom, 0);
   width: 50%;
   height: 50%;
   z-index: 20;
@@ -73,6 +86,7 @@ body {
   position: absolute;
   right: 30px;
   bottom: 30px;
+  bottom: calc(30px + env(safe-area-inset-bottom, 0px));
   width: 80px;
   height: 80px;
   border-radius: 50%;
@@ -125,6 +139,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100vh);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -215,6 +231,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100vh);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -259,6 +277,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100vh);
   background: #1a1a2e;
   color: #4a90e2;
   font-size: 18px;

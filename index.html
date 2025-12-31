@@ -27,6 +27,19 @@
       <div id="loading">Loading...</div>
     </div>
 
+    <script>
+      // Fix mobile viewport height (accounts for browser chrome)
+      function setAppHeight() {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', vh + 'px');
+        document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+      }
+      setAppHeight();
+      window.addEventListener('resize', setAppHeight);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(setAppHeight, 100);
+      });
+    </script>
     <script type="module" src="/src/main.ts"></script>
     <script>
       // Register service worker for PWA

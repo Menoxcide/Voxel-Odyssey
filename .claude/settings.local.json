@@ -10,7 +10,8 @@
       "Bash(git push:*)",
       "Bash(git remote set-url:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(npm i:*)"
+      "Bash(npm i:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
