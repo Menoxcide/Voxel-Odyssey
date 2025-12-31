@@ -151,52 +151,61 @@ export class InputManager {
   private setupCameraTouchControl(): void {
     let lastTouchX = 0;
     let lastTouchY = 0;
-    let cameraTouch: Touch | null = null;
+    let cameraTouchId: number | null = null;
 
     // Use the canvas for camera touch on right side of screen
     this.canvas.addEventListener('touchstart', (e: TouchEvent) => {
+      // Don't capture if we already have a camera touch
+      if (cameraTouchId !== null) return;
+
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
-        // Only use touches on right half of screen for camera
-        if (touch.clientX > window.innerWidth * 0.4 && !cameraTouch) {
-          cameraTouch = touch;
+        // Only use touches on right 50% of screen for camera (leave left for joystick)
+        if (touch.clientX > window.innerWidth * 0.5) {
+          cameraTouchId = touch.identifier;
           lastTouchX = touch.clientX;
           lastTouchY = touch.clientY;
+          break;
         }
       }
     }, { passive: true });
 
     this.canvas.addEventListener('touchmove', (e: TouchEvent) => {
-      if (!cameraTouch) return;
+      if (cameraTouchId === null) return;
 
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
-        if (touch.identifier === cameraTouch.identifier) {
+        if (touch.identifier === cameraTouchId) {
           const deltaX = touch.clientX - lastTouchX;
           const deltaY = touch.clientY - lastTouchY;
 
-          // Rotate camera based on touch movement
-          this.state.aimX += deltaX * 0.005;
+          // Rotate camera based on touch movement (reduced sensitivity)
+          this.state.aimX += deltaX * 0.003;
           this.state.aimY = Math.max(
             -Math.PI / 3,
-            Math.min(Math.PI / 3, this.state.aimY - deltaY * 0.003)
+            Math.min(Math.PI / 3, this.state.aimY - deltaY * 0.002)
           );
 
           lastTouchX = touch.clientX;
           lastTouchY = touch.clientY;
+          break;
         }
       }
     }, { passive: true });
 
-    this.canvas.addEventListener('touchend', (e: TouchEvent) => {
-      if (!cameraTouch) return;
+    const endCameraTouch = (e: TouchEvent) => {
+      if (cameraTouchId === null) return;
 
       for (let i = 0; i < e.changedTouches.length; i++) {
-        if (cameraTouch && e.changedTouches[i].identifier === cameraTouch.identifier) {
-          cameraTouch = null;
+        if (e.changedTouches[i].identifier === cameraTouchId) {
+          cameraTouchId = null;
+          break;
         }
       }
-    }, { passive: true });
+    };
+
+    this.canvas.addEventListener('touchend', endCameraTouch, { passive: true });
+    this.canvas.addEventListener('touchcancel', endCameraTouch, { passive: true });
   }
 
   async requestGyroPermission(): Promise<boolean> {
