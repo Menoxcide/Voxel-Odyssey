@@ -1,0 +1,26 @@
+{
+  "name": "voxel-odyssey",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.165.0",
+    "cannon-es": "^0.20.0",
+    "howler": "^2.2.4",
+    "nipplejs": "^0.10.2"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "typescript": "^5.4.0",
+    "@types/three": "^0.165.0",
+    "sass": "^1.75.0",
+    "vite-plugin-pwa": "^0.20.0",
+    "workbox-window": "^7.0.0"
+  }
+}
