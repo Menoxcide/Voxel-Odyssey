@@ -6,7 +6,10 @@
       "Bash(npm install)",
       "Bash(git remote add:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(npm run typecheck:*)"
     ]
   }
 }
