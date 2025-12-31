@@ -16,6 +16,9 @@ export class Player {
   private isGrounded = false;
   private canJump = true;
 
+  // Terrain following
+  private getTerrainHeight: ((x: number, z: number) => number) | null = null;
+
   // Combat
   private shootCooldown = 0;
   private readonly shootRate = 0.15; // ~6.6 shots per second
@@ -109,6 +112,20 @@ export class Player {
     // Reset jump when button released
     if (!input.jumping) {
       this.canJump = true;
+    }
+
+    // Follow terrain height
+    if (this.getTerrainHeight) {
+      const terrainY = this.getTerrainHeight(this.body.position.x, this.body.position.z) + 1;
+      // Only push up if below terrain, allow jumping above
+      if (this.body.position.y < terrainY) {
+        this.body.position.y = terrainY;
+        if (this.body.velocity.y < 0) {
+          this.body.velocity.y = 0;
+        }
+        this.isGrounded = true;
+        this.canJump = true;
+      }
     }
 
     // Sync model with physics
@@ -246,6 +263,10 @@ export class Player {
 
   getBody(): CANNON.Body {
     return this.body;
+  }
+
+  setTerrainHeightGetter(getter: (x: number, z: number) => number): void {
+    this.getTerrainHeight = getter;
   }
 
   dispose(): void {

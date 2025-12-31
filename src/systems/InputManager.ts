@@ -109,9 +109,9 @@ export class InputManager {
       this.joystick = nipplejs.create({
         zone: joystickZone,
         mode: 'static',
-        position: { left: '80px', bottom: '80px' },
+        position: { left: '100px', bottom: '100px' },
         color: 'rgba(74, 144, 226, 0.5)',
-        size: 120
+        size: 150 // Bigger joystick
       });
 
       this.joystick.on('move', (_evt: unknown, data: JoystickOutputData) => {
@@ -143,6 +143,60 @@ export class InputManager {
         this.state.shooting = false;
       }, { passive: false });
     }
+
+    // Right side touch drag for camera rotation
+    this.setupCameraTouchControl();
+  }
+
+  private setupCameraTouchControl(): void {
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let cameraTouch: Touch | null = null;
+
+    // Use the canvas for camera touch on right side of screen
+    this.canvas.addEventListener('touchstart', (e: TouchEvent) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        // Only use touches on right half of screen for camera
+        if (touch.clientX > window.innerWidth * 0.4 && !cameraTouch) {
+          cameraTouch = touch;
+          lastTouchX = touch.clientX;
+          lastTouchY = touch.clientY;
+        }
+      }
+    }, { passive: true });
+
+    this.canvas.addEventListener('touchmove', (e: TouchEvent) => {
+      if (!cameraTouch) return;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === cameraTouch.identifier) {
+          const deltaX = touch.clientX - lastTouchX;
+          const deltaY = touch.clientY - lastTouchY;
+
+          // Rotate camera based on touch movement
+          this.state.aimX += deltaX * 0.005;
+          this.state.aimY = Math.max(
+            -Math.PI / 3,
+            Math.min(Math.PI / 3, this.state.aimY - deltaY * 0.003)
+          );
+
+          lastTouchX = touch.clientX;
+          lastTouchY = touch.clientY;
+        }
+      }
+    }, { passive: true });
+
+    this.canvas.addEventListener('touchend', (e: TouchEvent) => {
+      if (!cameraTouch) return;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (cameraTouch && e.changedTouches[i].identifier === cameraTouch.identifier) {
+          cameraTouch = null;
+        }
+      }
+    }, { passive: true });
   }
 
   async requestGyroPermission(): Promise<boolean> {

@@ -24,7 +24,7 @@ export const Level1: LevelConfig = {
   bossSpawn: null,
   bossEnabled: false,
 
-  // Simple enemy waves
+  // Simple enemy waves - introduce basic types
   enemyWaves: [
     // Wave 1: Single minion
     [
@@ -35,11 +35,16 @@ export const Level1: LevelConfig = {
       { type: 'minion', position: new THREE.Vector3(-10, 3, 10), delay: 0 },
       { type: 'minion', position: new THREE.Vector3(10, 3, -10), delay: 1 }
     ],
-    // Wave 3: Three minions + bomber
+    // Wave 3: Introduce speeder (fast enemy)
     [
       { type: 'minion', position: new THREE.Vector3(15, 3, 0), delay: 0 },
-      { type: 'minion', position: new THREE.Vector3(-15, 3, 0), delay: 0.5 },
-      { type: 'minion', position: new THREE.Vector3(0, 3, 15), delay: 1 },
+      { type: 'speeder', position: new THREE.Vector3(-15, 3, 0), delay: 1 },
+      { type: 'minion', position: new THREE.Vector3(0, 3, 15), delay: 1.5 }
+    ],
+    // Wave 4: Introduce shooter (ranged enemy)
+    [
+      { type: 'shooter', position: new THREE.Vector3(18, 3, 0), delay: 0 },
+      { type: 'minion', position: new THREE.Vector3(-10, 3, 10), delay: 1 },
       { type: 'bomber', position: new THREE.Vector3(0, 3, -15), delay: 2 }
     ]
   ],

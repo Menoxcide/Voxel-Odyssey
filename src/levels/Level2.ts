@@ -24,37 +24,45 @@ export const Level2: LevelConfig = {
   bossSpawn: null,
   bossEnabled: false,
 
-  // Continuous enemy spawns
+  // Varied enemy waves with new types
   enemyWaves: [
-    // Wave 1
+    // Wave 1: Basic introduction
     [
-      { type: 'minion', position: new THREE.Vector3(0, 3, 0), delay: 3 },
-      { type: 'minion', position: new THREE.Vector3(10, 3, 10), delay: 4 },
-      { type: 'bomber', position: new THREE.Vector3(-10, 3, 10), delay: 5 }
+      { type: 'minion', position: new THREE.Vector3(0, 3, 0), delay: 2 },
+      { type: 'minion', position: new THREE.Vector3(10, 3, 10), delay: 3 },
+      { type: 'speeder', position: new THREE.Vector3(-10, 3, 10), delay: 4 }
     ],
-    // Wave 2
+    // Wave 2: Add shooters
     [
-      { type: 'minion', position: new THREE.Vector3(20, 3, 0), delay: 0 },
-      { type: 'minion', position: new THREE.Vector3(-20, 3, 0), delay: 0 },
-      { type: 'bomber', position: new THREE.Vector3(0, 3, 20), delay: 2 },
-      { type: 'bomber', position: new THREE.Vector3(0, 3, -20), delay: 2 }
+      { type: 'shooter', position: new THREE.Vector3(25, 3, 0), delay: 0 },
+      { type: 'shooter', position: new THREE.Vector3(-25, 3, 0), delay: 0 },
+      { type: 'minion', position: new THREE.Vector3(0, 3, 20), delay: 2 },
+      { type: 'speeder', position: new THREE.Vector3(0, 3, -20), delay: 2 }
     ],
-    // Wave 3
+    // Wave 3: Tank introduction with healer support
     [
-      { type: 'minion', position: new THREE.Vector3(15, 3, 15), delay: 0 },
-      { type: 'minion', position: new THREE.Vector3(-15, 3, 15), delay: 0 },
-      { type: 'minion', position: new THREE.Vector3(15, 3, -15), delay: 0 },
-      { type: 'minion', position: new THREE.Vector3(-15, 3, -15), delay: 0 },
-      { type: 'bomber', position: new THREE.Vector3(0, 3, 0), delay: 3 }
+      { type: 'tank', position: new THREE.Vector3(0, 3, 25), delay: 0 },
+      { type: 'healer', position: new THREE.Vector3(5, 3, 20), delay: 1 },
+      { type: 'minion', position: new THREE.Vector3(-15, 3, 15), delay: 2 },
+      { type: 'minion', position: new THREE.Vector3(15, 3, 15), delay: 2 }
     ],
-    // Wave 4
+    // Wave 4: Shielders and bombers
     [
-      { type: 'bomber', position: new THREE.Vector3(10, 3, 0), delay: 0 },
-      { type: 'bomber', position: new THREE.Vector3(-10, 3, 0), delay: 0 },
-      { type: 'bomber', position: new THREE.Vector3(0, 3, 10), delay: 0 },
-      { type: 'bomber', position: new THREE.Vector3(0, 3, -10), delay: 0 },
-      { type: 'minion', position: new THREE.Vector3(20, 3, 20), delay: 2 },
-      { type: 'minion', position: new THREE.Vector3(-20, 3, -20), delay: 2 }
+      { type: 'shielder', position: new THREE.Vector3(15, 3, 0), delay: 0 },
+      { type: 'shielder', position: new THREE.Vector3(-15, 3, 0), delay: 0 },
+      { type: 'bomber', position: new THREE.Vector3(0, 3, 15), delay: 2 },
+      { type: 'bomber', position: new THREE.Vector3(0, 3, -15), delay: 2 },
+      { type: 'speeder', position: new THREE.Vector3(20, 3, 20), delay: 3 }
+    ],
+    // Wave 5: Full chaos
+    [
+      { type: 'tank', position: new THREE.Vector3(0, 3, 0), delay: 0 },
+      { type: 'shooter', position: new THREE.Vector3(20, 3, 10), delay: 1 },
+      { type: 'shooter', position: new THREE.Vector3(-20, 3, 10), delay: 1 },
+      { type: 'healer', position: new THREE.Vector3(0, 3, -15), delay: 2 },
+      { type: 'speeder', position: new THREE.Vector3(25, 3, -10), delay: 3 },
+      { type: 'speeder', position: new THREE.Vector3(-25, 3, -10), delay: 3 },
+      { type: 'bomber', position: new THREE.Vector3(10, 3, 25), delay: 4 }
     ]
   ],
   waveCooldown: 10,

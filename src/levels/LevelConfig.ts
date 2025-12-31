@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
+export type EnemyType = 'minion' | 'bomber' | 'shooter' | 'tank' | 'speeder' | 'healer' | 'shielder';
+
 export interface EnemySpawn {
-  type: 'minion' | 'bomber';
+  type: EnemyType;
   position: THREE.Vector3;
   delay: number; // seconds after level start
 }

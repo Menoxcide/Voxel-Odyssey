@@ -284,6 +284,10 @@ export class Enemy {
     return this.config.damage;
   }
 
+  heal(amount: number): void {
+    this.healthSystem.heal(amount);
+  }
+
   dispose(scene: THREE.Scene, physicsWorld: CANNON.World): void {
     scene.remove(this.mesh);
     this.mesh.geometry.dispose();
@@ -320,5 +324,419 @@ export class SuicideBomber extends Enemy {
       this.onExplode(this.getPosition(), this.explosionRadius, this.config.damage);
     }
     this.die();
+  }
+}
+
+// Shooter enemy - fires projectiles at player from range
+export class Shooter extends Enemy {
+  public onShoot?: (origin: THREE.Vector3, direction: THREE.Vector3, speed: number, damage: number) => void;
+  private readonly projectileSpeed = 15;
+
+  constructor(
+    scene: THREE.Scene,
+    physicsWorld: CANNON.World,
+    spawnPosition: THREE.Vector3
+  ) {
+    super(scene, physicsWorld, spawnPosition, {
+      health: 2,
+      speed: 3,
+      damage: 1,
+      detectionRange: 25,
+      attackRange: 15,
+      attackCooldown: 2,
+      color: 0xf59e0b, // Orange
+      scale: 0.7
+    });
+
+    // Add spikes to shooter mesh to differentiate
+    this.addSpikes(scene);
+  }
+
+  private addSpikes(_scene: THREE.Scene): void {
+    const spikeGeometry = new THREE.ConeGeometry(0.15, 0.4, 4);
+    const spikeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 0.5
+    });
+
+    // Add 4 spikes around the sphere
+    for (let i = 0; i < 4; i++) {
+      const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+      const angle = (i / 4) * Math.PI * 2;
+      spike.position.set(
+        Math.cos(angle) * 0.4,
+        0,
+        Math.sin(angle) * 0.4
+      );
+      spike.rotation.z = -Math.PI / 2;
+      spike.rotation.y = angle;
+      this.mesh.add(spike);
+    }
+  }
+
+  protected override updateChase(_delta: number, playerPosition: THREE.Vector3, distanceToPlayer: number): void {
+    // Shooter tries to maintain distance - backs up if too close
+    if (distanceToPlayer < this.config.attackRange * 0.5) {
+      const awayFromPlayer = new THREE.Vector3()
+        .subVectors(this.getPosition(), playerPosition);
+      awayFromPlayer.y = 0;
+      awayFromPlayer.normalize();
+
+      this.body.velocity.x = awayFromPlayer.x * this.config.speed;
+      this.body.velocity.z = awayFromPlayer.z * this.config.speed;
+      return;
+    }
+
+    if (distanceToPlayer > this.config.detectionRange * 1.5) {
+      this.state = EnemyState.PATROL;
+      return;
+    }
+
+    if (distanceToPlayer < this.config.attackRange) {
+      this.state = EnemyState.ATTACK;
+      return;
+    }
+
+    // Move toward player but slowly
+    const toPlayer = new THREE.Vector3()
+      .subVectors(playerPosition, this.getPosition());
+    toPlayer.y = 0;
+    toPlayer.normalize();
+
+    this.body.velocity.x = toPlayer.x * this.config.speed;
+    this.body.velocity.z = toPlayer.z * this.config.speed;
+  }
+
+  protected override performAttack(targetPosition: THREE.Vector3): void {
+    if (this.onShoot) {
+      const direction = new THREE.Vector3()
+        .subVectors(targetPosition, this.getPosition())
+        .normalize();
+      // Add slight inaccuracy
+      direction.x += (Math.random() - 0.5) * 0.1;
+      direction.z += (Math.random() - 0.5) * 0.1;
+      direction.normalize();
+
+      this.onShoot(this.getPosition(), direction, this.projectileSpeed, this.config.damage);
+    }
+  }
+}
+
+// Tank enemy - slow but high HP, knocks back player
+export class Tank extends Enemy {
+  private chargeTimer = 0;
+  private isCharging = false;
+  private chargeDirection = new THREE.Vector3();
+
+  constructor(
+    scene: THREE.Scene,
+    physicsWorld: CANNON.World,
+    spawnPosition: THREE.Vector3
+  ) {
+    super(scene, physicsWorld, spawnPosition, {
+      health: 5,
+      speed: 2.5,
+      damage: 2,
+      detectionRange: 12,
+      attackRange: 2.5,
+      attackCooldown: 3,
+      color: 0x6366f1, // Indigo
+      scale: 1.2
+    });
+
+    // Make tank mesh more cube-like
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = new THREE.BoxGeometry(
+      1 * this.config.scale,
+      0.8 * this.config.scale,
+      1 * this.config.scale
+    );
+  }
+
+  override update(delta: number, playerPosition: THREE.Vector3): void {
+    if (this.isCharging) {
+      this.chargeTimer -= delta;
+
+      // Charge movement
+      this.body.velocity.x = this.chargeDirection.x * this.config.speed * 4;
+      this.body.velocity.z = this.chargeDirection.z * this.config.speed * 4;
+
+      if (this.chargeTimer <= 0) {
+        this.isCharging = false;
+        this.state = EnemyState.CHASE;
+      }
+
+      // Still sync mesh position
+      this.mesh.position.x = this.body.position.x;
+      this.mesh.position.y = this.body.position.y;
+      this.mesh.position.z = this.body.position.z;
+      return;
+    }
+
+    super.update(delta, playerPosition);
+  }
+
+  protected override performAttack(targetPosition: THREE.Vector3): void {
+    // Start a charge attack
+    this.chargeDirection.subVectors(targetPosition, this.getPosition());
+    this.chargeDirection.y = 0;
+    this.chargeDirection.normalize();
+
+    this.isCharging = true;
+    this.chargeTimer = 0.5; // Charge for 0.5 seconds
+
+    super.performAttack(targetPosition);
+  }
+}
+
+// Speeder enemy - very fast, hit-and-run tactics
+export class Speeder extends Enemy {
+  private retreatTimer = 0;
+  private isRetreating = false;
+
+  constructor(
+    scene: THREE.Scene,
+    physicsWorld: CANNON.World,
+    spawnPosition: THREE.Vector3
+  ) {
+    super(scene, physicsWorld, spawnPosition, {
+      health: 1,
+      speed: 12,
+      damage: 1,
+      detectionRange: 30,
+      attackRange: 1.5,
+      attackCooldown: 0.5,
+      color: 0x22d3ee, // Cyan
+      scale: 0.4
+    });
+
+    // Elongate the mesh for speed appearance
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = new THREE.CapsuleGeometry(0.2, 0.5, 4, 8);
+  }
+
+  override update(delta: number, playerPosition: THREE.Vector3): void {
+    if (this.isRetreating) {
+      this.retreatTimer -= delta;
+
+      // Retreat away from player
+      const awayFromPlayer = new THREE.Vector3()
+        .subVectors(this.getPosition(), playerPosition);
+      awayFromPlayer.y = 0;
+      awayFromPlayer.normalize();
+
+      this.body.velocity.x = awayFromPlayer.x * this.config.speed;
+      this.body.velocity.z = awayFromPlayer.z * this.config.speed;
+
+      if (this.retreatTimer <= 0) {
+        this.isRetreating = false;
+      }
+
+      // Sync mesh
+      this.mesh.position.x = this.body.position.x;
+      this.mesh.position.y = this.body.position.y + Math.sin(this.animationTime * 5) * 0.3;
+      this.mesh.position.z = this.body.position.z;
+
+      // Face movement direction
+      this.mesh.rotation.y = Math.atan2(awayFromPlayer.x, awayFromPlayer.z);
+      return;
+    }
+
+    super.update(delta, playerPosition);
+
+    // Face player when chasing
+    if (this.state === EnemyState.CHASE) {
+      const toPlayer = new THREE.Vector3().subVectors(playerPosition, this.getPosition());
+      this.mesh.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+    }
+  }
+
+  protected override performAttack(targetPosition: THREE.Vector3): void {
+    super.performAttack(targetPosition);
+
+    // After attacking, retreat
+    this.isRetreating = true;
+    this.retreatTimer = 1.5;
+  }
+}
+
+// Healer enemy - heals nearby allies, weak in combat
+export class Healer extends Enemy {
+  private healRadius = 8;
+  private healAmount = 1;
+  public onHeal?: (position: THREE.Vector3, radius: number) => void;
+
+  // Store reference to find other enemies
+  private readonly allEnemies: () => Enemy[];
+
+  constructor(
+    scene: THREE.Scene,
+    physicsWorld: CANNON.World,
+    spawnPosition: THREE.Vector3,
+    enemiesGetter: () => Enemy[]
+  ) {
+    super(scene, physicsWorld, spawnPosition, {
+      health: 2,
+      speed: 4,
+      damage: 0,
+      detectionRange: 20,
+      attackRange: 10,
+      attackCooldown: 3,
+      color: 0x4ade80, // Green
+      scale: 0.6
+    });
+
+    this.allEnemies = enemiesGetter;
+
+    // Add healing ring visual
+    this.addHealingRing(scene);
+  }
+
+  private addHealingRing(_scene: THREE.Scene): void {
+    const ringGeometry = new THREE.TorusGeometry(0.5, 0.05, 8, 16);
+    const ringMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4ade80,
+      emissive: 0x4ade80,
+      emissiveIntensity: 0.8,
+      transparent: true,
+      opacity: 0.6
+    });
+
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    this.mesh.add(ring);
+  }
+
+  protected override updateChase(_delta: number, playerPosition: THREE.Vector3, distanceToPlayer: number): void {
+    // Healer tries to stay away from player
+    if (distanceToPlayer < 8) {
+      const awayFromPlayer = new THREE.Vector3()
+        .subVectors(this.getPosition(), playerPosition);
+      awayFromPlayer.y = 0;
+      awayFromPlayer.normalize();
+
+      this.body.velocity.x = awayFromPlayer.x * this.config.speed;
+      this.body.velocity.z = awayFromPlayer.z * this.config.speed;
+    } else {
+      // Stay near other enemies
+      this.body.velocity.x *= 0.9;
+      this.body.velocity.z *= 0.9;
+    }
+
+    // Always try to heal when in range
+    if (this.attackCooldown <= 0) {
+      this.state = EnemyState.ATTACK;
+    }
+  }
+
+  protected override performAttack(_targetPosition: THREE.Vector3): void {
+    // Heal nearby enemies
+    const myPos = this.getPosition();
+    const enemies = this.allEnemies();
+
+    for (const enemy of enemies) {
+      if (enemy === this) continue;
+      if (enemy.isDead()) continue;
+
+      const dist = enemy.getPosition().distanceTo(myPos);
+      if (dist <= this.healRadius) {
+        // Heal the enemy (we need to access healthSystem)
+        enemy.heal(this.healAmount);
+      }
+    }
+
+    if (this.onHeal) {
+      this.onHeal(myPos, this.healRadius);
+    }
+  }
+}
+
+// Shielder enemy - has a regenerating shield
+export class Shielder extends Enemy {
+  private shield: number;
+  private readonly maxShield = 3;
+  private shieldRegenTimer = 0;
+  private readonly shieldRegenDelay = 5;
+  private shieldMesh: THREE.Mesh;
+
+  constructor(
+    scene: THREE.Scene,
+    physicsWorld: CANNON.World,
+    spawnPosition: THREE.Vector3
+  ) {
+    super(scene, physicsWorld, spawnPosition, {
+      health: 2,
+      speed: 3.5,
+      damage: 1,
+      detectionRange: 15,
+      attackRange: 2,
+      attackCooldown: 1.5,
+      color: 0x8b5cf6, // Purple
+      scale: 0.7
+    });
+
+    this.shield = this.maxShield;
+
+    // Create shield visual
+    const shieldGeometry = new THREE.IcosahedronGeometry(0.6, 1);
+    const shieldMaterial = new THREE.MeshStandardMaterial({
+      color: 0x60a5fa,
+      emissive: 0x60a5fa,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.4,
+      wireframe: true
+    });
+
+    this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+    this.mesh.add(this.shieldMesh);
+  }
+
+  override update(delta: number, playerPosition: THREE.Vector3): void {
+    super.update(delta, playerPosition);
+
+    // Regenerate shield over time
+    if (this.shield < this.maxShield) {
+      this.shieldRegenTimer += delta;
+      if (this.shieldRegenTimer >= this.shieldRegenDelay) {
+        this.shield = Math.min(this.shield + 1, this.maxShield);
+        this.shieldRegenTimer = 0;
+      }
+    }
+
+    // Update shield visual
+    this.shieldMesh.visible = this.shield > 0;
+    this.shieldMesh.scale.setScalar(0.8 + (this.shield / this.maxShield) * 0.4);
+    this.shieldMesh.rotation.y += delta * 2;
+    this.shieldMesh.rotation.x += delta * 1.5;
+  }
+
+  override takeDamage(amount: number = 1): boolean {
+    if (this.state === EnemyState.DEAD) return false;
+
+    // Shield absorbs damage first
+    if (this.shield > 0) {
+      this.shield -= amount;
+      this.shieldRegenTimer = 0; // Reset regen timer on hit
+      this.damageFlashTime = 0.2;
+
+      if (this.shield < 0) {
+        // Overflow damage goes to health
+        const overflow = -this.shield;
+        this.shield = 0;
+        return super.takeDamage(overflow);
+      }
+      return true;
+    }
+
+    return super.takeDamage(amount);
+  }
+
+  // Override dispose to clean up shield mesh
+  override dispose(scene: THREE.Scene, physicsWorld: CANNON.World): void {
+    this.shieldMesh.geometry.dispose();
+    (this.shieldMesh.material as THREE.Material).dispose();
+    super.dispose(scene, physicsWorld);
   }
 }

@@ -7,7 +7,7 @@ import { AudioManager } from '../systems/AudioManager';
 import { StorageManager } from '../systems/StorageManager';
 import { WorldGenerator } from './WorldGenerator';
 import { Player } from './Player';
-import { Enemy, SuicideBomber } from './Enemy';
+import { Enemy, SuicideBomber, Shooter, Tank, Speeder, Healer, Shielder } from './Enemy';
 import { Boss } from './Boss';
 import { ParticleSystem, ScreenShake, HitStop } from '../rendering/Effects';
 import { PhysicsWorld, ProjectileSystem } from './CombatSystem';
@@ -229,6 +229,9 @@ export class Game {
 
     this.player = new Player(this.scene, this.physicsWorld.getWorld(), playerSpawn);
 
+    // Set terrain height getter for proper terrain following
+    this.player.setTerrainHeightGetter((x, z) => this.worldGenerator!.getHeightAt(x, z));
+
     // Boss (if enabled)
     if (level.bossEnabled && level.bossSpawn) {
       const bossY = this.worldGenerator.getHeightAt(level.bossSpawn.x, level.bossSpawn.z) + 3;
@@ -443,9 +446,47 @@ export class Game {
     const y = this.worldGenerator.getHeightAt(spawn.position.x, spawn.position.z) + 2;
     const position = new THREE.Vector3(spawn.position.x, y, spawn.position.z);
 
-    const enemy = spawn.type === 'bomber'
-      ? new SuicideBomber(this.scene, this.physicsWorld.getWorld(), position)
-      : new Enemy(this.scene, this.physicsWorld.getWorld(), position);
+    let enemy: Enemy;
+
+    switch (spawn.type) {
+      case 'bomber':
+        enemy = new SuicideBomber(this.scene, this.physicsWorld.getWorld(), position);
+        break;
+      case 'shooter':
+        const shooter = new Shooter(this.scene, this.physicsWorld.getWorld(), position);
+        shooter.onShoot = (origin, direction, speed, damage) => {
+          this.projectileSystem.fire(origin, direction, speed, false, damage, (hitBody) => {
+            if (this.player && hitBody === this.player.getBody()) {
+              this.damagePlayer(damage);
+            }
+          });
+          this.particleSystem.emit(origin, 3, 0xf59e0b, 0.2, 2, 0.15);
+          this.audioManager.play('shoot');
+        };
+        enemy = shooter;
+        break;
+      case 'tank':
+        enemy = new Tank(this.scene, this.physicsWorld.getWorld(), position);
+        break;
+      case 'speeder':
+        enemy = new Speeder(this.scene, this.physicsWorld.getWorld(), position);
+        break;
+      case 'healer':
+        const healer = new Healer(this.scene, this.physicsWorld.getWorld(), position, () => this.enemies);
+        healer.onHeal = (pos, _radius) => {
+          // Show heal effect
+          this.particleSystem.emit(pos, 10, 0x4ade80, 0.5, 4, 0.3);
+        };
+        enemy = healer;
+        break;
+      case 'shielder':
+        enemy = new Shielder(this.scene, this.physicsWorld.getWorld(), position);
+        break;
+      case 'minion':
+      default:
+        enemy = new Enemy(this.scene, this.physicsWorld.getWorld(), position);
+        break;
+    }
 
     this.enemies.push(enemy);
   }
