@@ -179,11 +179,13 @@ export class InputManager {
           const deltaX = touch.clientX - lastTouchX;
           const deltaY = touch.clientY - lastTouchY;
 
-          // Rotate camera based on touch movement (reduced sensitivity)
-          this.state.aimX += deltaX * 0.003;
+          // Rotate camera - matches finger movement speed
+          // Swipe across half the screen width = 90 degree turn
+          const sensitivity = 0.002;
+          this.state.aimX += deltaX * sensitivity;
           this.state.aimY = Math.max(
-            -Math.PI / 3,
-            Math.min(Math.PI / 3, this.state.aimY - deltaY * 0.002)
+            -Math.PI / 4,
+            Math.min(Math.PI / 4, this.state.aimY - deltaY * sensitivity)
           );
 
           lastTouchX = touch.clientX;
