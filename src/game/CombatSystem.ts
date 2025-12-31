@@ -178,15 +178,25 @@ export class ProjectileSystem {
       });
       body.collisionResponse = false; // Trigger only, no physics response
 
-      this.pool.push({
+      const projectile: Projectile = {
         mesh,
         body,
         active: false,
         damage: 1,
         lifetime: 0,
         isPlayerProjectile: true
+      };
+
+      // Set up collision handler ONCE during initialization
+      body.addEventListener('collide', (event: { body: CANNON.Body }) => {
+        if (projectile.active && projectile.onHit) {
+          projectile.onHit(event.body);
+        }
+        // Schedule deactivation for next frame to avoid mid-step removal
+        setTimeout(() => this.deactivate(projectile), 0);
       });
 
+      this.pool.push(projectile);
       this.scene.add(mesh);
     }
   }
@@ -231,16 +241,10 @@ export class ProjectileSystem {
       ? COLLISION_GROUPS.GROUND | COLLISION_GROUPS.ENEMY
       : COLLISION_GROUPS.GROUND | COLLISION_GROUPS.PLAYER;
 
-    // Add to physics world
-    this.physicsWorld.getWorld().addBody(projectile.body);
-
-    // Collision handler
-    projectile.body.addEventListener('collide', (event: { body: CANNON.Body }) => {
-      if (projectile.active && projectile.onHit) {
-        projectile.onHit(event.body);
-      }
-      this.deactivate(projectile);
-    });
+    // Add to physics world if not already added
+    if (!this.physicsWorld.getWorld().bodies.includes(projectile.body)) {
+      this.physicsWorld.getWorld().addBody(projectile.body);
+    }
 
     return projectile;
   }
@@ -271,12 +275,13 @@ export class ProjectileSystem {
     projectile.active = false;
     projectile.mesh.visible = false;
     projectile.body.velocity.set(0, 0, 0);
+    projectile.onHit = undefined; // Clear hit callback
 
-    // Remove from physics world
-    this.physicsWorld.getWorld().removeBody(projectile.body);
-
-    // Clear event listeners
-    projectile.body.removeEventListener('collide', () => { });
+    // Remove from physics world if present
+    const world = this.physicsWorld.getWorld();
+    if (world.bodies.includes(projectile.body)) {
+      world.removeBody(projectile.body);
+    }
   }
 
   getActiveCount(): number {
