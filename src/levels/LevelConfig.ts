@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HazardType, HazardConfig } from '../game/Hazard';
 
 export type EnemyType = 'minion' | 'bomber' | 'shooter' | 'tank' | 'speeder' | 'healer' | 'shielder';
 
@@ -12,6 +13,10 @@ export interface PowerUp {
   type: 'health' | 'speed' | 'damage';
   position: THREE.Vector3;
 }
+
+// Re-export for convenience
+export { HazardType };
+export type { HazardConfig };
 
 export interface LevelConfig {
   id: string;
@@ -39,6 +44,9 @@ export interface LevelConfig {
   // Powerups
   powerUps: PowerUp[];
 
+  // Environmental hazards
+  hazards: HazardConfig[];
+
   // Environment
   fogNear: number;
   fogFar: number;
@@ -62,6 +70,7 @@ export const DEFAULT_LEVEL_CONFIG: Partial<LevelConfig> = {
   waterLevel: -1,
   treeChance: 0.03,
   waveCooldown: 5,
+  hazards: [],
   fogNear: 50,
   fogFar: 200,
   fogColor: 0x87ceeb,

@@ -1,20 +1,21 @@
 import * as THREE from 'three';
+import { ClassColors } from '../game/classes/ClassConfig';
 
-// Color palette
-const PLAYER_COLORS = {
-  PRIMARY: 0x4a90e2,
-  SECONDARY: 0x2c5aa0,
-  STAFF: 0x78350f,
-  ORB: 0x60a5fa,
-  ORB_EMISSIVE: 0x3b82f6
+// Default color palette (Mage class)
+const PLAYER_COLORS: ClassColors = {
+  primary: 0x4a90e2,
+  secondary: 0x2c5aa0,
+  staff: 0x78350f,
+  orb: 0x60a5fa,
+  orbEmissive: 0x3b82f6
 };
 
-const BOSS_COLORS = {
-  PRIMARY: 0xa855f7,
-  SECONDARY: 0x7c3aed,
-  STAFF: 0x581c87,
-  ORB: 0xc084fc,
-  ORB_EMISSIVE: 0xa855f7
+const BOSS_COLORS: ClassColors = {
+  primary: 0xa855f7,
+  secondary: 0x7c3aed,
+  staff: 0x581c87,
+  orb: 0xc084fc,
+  orbEmissive: 0xa855f7
 };
 
 export interface CharacterAnimationState {
@@ -44,13 +45,16 @@ export class CharacterModel {
   protected damageFlashTime = 0;
   protected readonly materials: THREE.MeshStandardMaterial[] = [];
 
-  constructor(colors = PLAYER_COLORS) {
+  protected colors: ClassColors;
+
+  constructor(colors: ClassColors = PLAYER_COLORS) {
     this.group = new THREE.Group();
+    this.colors = colors;
 
     // Create head (dodecahedron - IcosahedronGeometry with subdivision)
     const headGeometry = new THREE.IcosahedronGeometry(0.5, 1);
     const headMaterial = new THREE.MeshStandardMaterial({
-      color: colors.PRIMARY,
+      color: colors.primary,
       flatShading: true,
       metalness: 0,
       roughness: 0.7
@@ -63,7 +67,7 @@ export class CharacterModel {
     // Create body (cone)
     const bodyGeometry = new THREE.ConeGeometry(0.4, 1.2, 8);
     const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: colors.SECONDARY,
+      color: colors.secondary,
       flatShading: true,
       metalness: 0,
       roughness: 0.8
@@ -81,7 +85,7 @@ export class CharacterModel {
     // Staff cylinder
     const staffGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
     const staffMaterial = new THREE.MeshStandardMaterial({
-      color: colors.STAFF,
+      color: colors.staff,
       flatShading: true,
       metalness: 0.2,
       roughness: 0.6
@@ -93,8 +97,8 @@ export class CharacterModel {
     // Glowing orb at staff tip
     const orbGeometry = new THREE.SphereGeometry(0.15, 8, 8);
     const orbMaterial = new THREE.MeshStandardMaterial({
-      color: colors.ORB,
-      emissive: colors.ORB_EMISSIVE,
+      color: colors.orb,
+      emissive: colors.orbEmissive,
       emissiveIntensity: 0.5,
       flatShading: true,
       metalness: 0.3,
@@ -105,7 +109,7 @@ export class CharacterModel {
     this.materials.push(orbMaterial);
 
     // Add point light to orb
-    const orbLight = new THREE.PointLight(colors.ORB_EMISSIVE, 0.5, 5);
+    const orbLight = new THREE.PointLight(colors.orbEmissive, 0.5, 5);
     orbLight.position.copy(this.orb.position);
     this.staff.add(orbLight);
 
@@ -116,6 +120,10 @@ export class CharacterModel {
     this.group.add(this.head);
     this.group.add(this.body);
     this.group.add(this.staff);
+  }
+
+  getColors(): ClassColors {
+    return this.colors;
   }
 
   update(delta: number, velocity: THREE.Vector3): void {
@@ -255,7 +263,7 @@ export class BossModel extends CharacterModel {
     // Add ears (boxes)
     const earGeometry = new THREE.BoxGeometry(0.2, 0.4, 0.1);
     const earMaterial = new THREE.MeshStandardMaterial({
-      color: BOSS_COLORS.PRIMARY,
+      color: BOSS_COLORS.primary,
       flatShading: true
     });
 
@@ -276,7 +284,7 @@ export class BossModel extends CharacterModel {
     // Add tail (tube/cylinder)
     const tailGeometry = new THREE.CylinderGeometry(0.08, 0.04, 1, 8);
     const tailMaterial = new THREE.MeshStandardMaterial({
-      color: BOSS_COLORS.SECONDARY,
+      color: BOSS_COLORS.secondary,
       flatShading: true
     });
 

@@ -1,0 +1,483 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOXEL ODYSSEY - ANIMATION SYSTEM
+// Keyframes and animation utilities for UI effects
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENTRANCE ANIMATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes glassAppear {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    transform: scale(1);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FEEDBACK ANIMATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(var(--color-primary-rgb), 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(var(--color-primary-rgb), 0.8);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.15);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.15);
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DAMAGE & COMBAT ANIMATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes damageFlash {
+  0% {
+    opacity: 0.4;
+    background: rgba(var(--color-danger-rgb), 0.3);
+  }
+  100% {
+    opacity: 0;
+    background: transparent;
+  }
+}
+
+@keyframes healthPulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
+@keyframes damageShake {
+  0%, 100% {
+    transform: translate(0);
+  }
+  25% {
+    transform: translate(-3px, 2px);
+  }
+  50% {
+    transform: translate(3px, -2px);
+  }
+  75% {
+    transform: translate(-2px, -1px);
+  }
+}
+
+@keyframes damageIndicatorPulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DANGER WARNING ANIMATIONS - Hearts pulse when threats are nearby
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes dangerPulse1 {
+  0%, 100% {
+    filter: brightness(1) drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    filter: brightness(1.1) drop-shadow(0 0 3px rgba(255, 100, 100, 0.3));
+  }
+}
+
+@keyframes dangerPulse2 {
+  0%, 100% {
+    filter: brightness(1) drop-shadow(0 0 0 transparent);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.2) drop-shadow(0 0 6px rgba(255, 50, 50, 0.5));
+    transform: scale(1.05);
+  }
+}
+
+@keyframes dangerPulse3 {
+  0%, 100% {
+    filter: brightness(1) drop-shadow(0 0 0 transparent);
+    transform: scale(1);
+  }
+  25% {
+    filter: brightness(1.4) drop-shadow(0 0 10px rgba(255, 0, 0, 0.8));
+    transform: scale(1.1);
+  }
+  50% {
+    filter: brightness(1.2) drop-shadow(0 0 5px rgba(255, 0, 0, 0.5));
+    transform: scale(1.05);
+  }
+  75% {
+    filter: brightness(1.4) drop-shadow(0 0 10px rgba(255, 0, 0, 0.8));
+    transform: scale(1.1);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COOLDOWN & PROGRESS ANIMATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes cooldownFill {
+  from {
+    --cooldown-progress: 100%;
+  }
+  to {
+    --cooldown-progress: 0%;
+  }
+}
+
+@keyframes cooldownReady {
+  0% {
+    box-shadow: 0 0 0 rgba(var(--color-success-rgb), 0);
+    border-color: var(--glass-border);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(var(--color-success-rgb), 0.8);
+    border-color: var(--color-success);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(var(--color-success-rgb), 0.4);
+    border-color: var(--color-success);
+  }
+}
+
+@keyframes progressBar {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// SVG-based circular cooldown
+@keyframes strokeDashReverse {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 283; // 2 * PI * 45 (circle circumference)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPECIAL EFFECT ANIMATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes glowPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 15px currentColor);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes rotateY {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLASS UNLOCK CELEBRATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+@keyframes unlockReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotateY(-90deg);
+    filter: brightness(2);
+  }
+  50% {
+    filter: brightness(2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes starBurst {
+  0% {
+    opacity: 1;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITY CLASSES
+// ─────────────────────────────────────────────────────────────────────────────
+
+.animate-fadeIn {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+.animate-fadeOut {
+  animation: fadeOut var(--transition-normal) forwards;
+}
+
+.animate-slideInUp {
+  animation: slideInUp var(--transition-normal) forwards;
+}
+
+.animate-slideInDown {
+  animation: slideInDown var(--transition-normal) forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn var(--transition-normal) forwards;
+}
+
+.animate-glassAppear {
+  animation: glassAppear var(--transition-slow) forwards;
+}
+
+.animate-pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.animate-pulseGlow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-bounce {
+  animation: bounce 0.5s ease-in-out infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+// Staggered children animation
+.stagger-children > * {
+  opacity: 0;
+  animation: slideInUp var(--transition-normal) forwards;
+}
+
+@for $i from 1 through 10 {
+  .stagger-children > *:nth-child(#{$i}) {
+    animation-delay: #{$i * 50}ms;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REDUCED MOTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,187 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOXEL ODYSSEY - CSS DESIGN TOKENS
+// Centralized design system for consistent theming
+// ═══════════════════════════════════════════════════════════════════════════════
+
+:root {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COLOR PALETTE
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Primary colors (Player/Mage theme)
+  --color-primary: #4a90e2;
+  --color-primary-light: #6ba8f0;
+  --color-primary-dark: #2c5aa0;
+  --color-primary-rgb: 74, 144, 226;
+
+  // Secondary colors (Boss/Purple theme)
+  --color-secondary: #a855f7;
+  --color-secondary-light: #c084fc;
+  --color-secondary-dark: #7c3aed;
+  --color-secondary-rgb: 168, 85, 247;
+
+  // Class colors
+  --color-mage: #4a90e2;
+  --color-warrior: #dc2626;
+  --color-ranger: #22c55e;
+  --color-healer: #fbbf24;
+
+  // Semantic colors
+  --color-danger: #ef4444;
+  --color-danger-light: #f87171;
+  --color-danger-dark: #dc2626;
+  --color-danger-rgb: 239, 68, 68;
+
+  --color-success: #4ade80;
+  --color-success-light: #86efac;
+  --color-success-dark: #22c55e;
+  --color-success-rgb: 74, 222, 128;
+
+  --color-warning: #f59e0b;
+  --color-warning-light: #fbbf24;
+  --color-warning-dark: #d97706;
+
+  // Neutral colors
+  --color-bg-dark: #1a1a2e;
+  --color-bg-darker: #0f0f1a;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // GLASSMORPHISM
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-bg-hover: rgba(255, 255, 255, 0.12);
+  --glass-bg-active: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-border-hover: rgba(255, 255, 255, 0.25);
+  --glass-blur: 12px;
+  --glass-blur-heavy: 20px;
+
+  // Dark glass variant
+  --glass-dark-bg: rgba(0, 0, 0, 0.4);
+  --glass-dark-bg-hover: rgba(0, 0, 0, 0.5);
+  --glass-dark-border: rgba(255, 255, 255, 0.1);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SHADOWS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --shadow-text: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-text-glow: 0 0 20px rgba(var(--color-primary-rgb), 0.5);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --shadow-glow-primary: 0 0 20px rgba(var(--color-primary-rgb), 0.6);
+  --shadow-glow-secondary: 0 0 20px rgba(var(--color-secondary-rgb), 0.6);
+  --shadow-glow-danger: 0 0 20px rgba(var(--color-danger-rgb), 0.6);
+  --shadow-glow-success: 0 0 20px rgba(var(--color-success-rgb), 0.6);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SPACING
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BORDER RADIUS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TRANSITIONS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TYPOGRAPHY
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-mono: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  --font-size-3xl: 48px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Z-INDEX LAYERS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  --z-base: 0;
+  --z-hud: 10;
+  --z-controls: 20;
+  --z-overlay: 50;
+  --z-modal: 100;
+  --z-tooltip: 150;
+  --z-max: 9999;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMPONENT-SPECIFIC
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Health bar
+  --health-full: var(--color-danger);
+  --health-empty: #374151;
+  --health-damaged: var(--color-secondary);
+
+  // Boss bar
+  --boss-bar-gradient: linear-gradient(90deg, var(--color-secondary-dark), var(--color-secondary));
+  --boss-bar-height: 20px;
+  --boss-bar-width: 300px;
+
+  // Buttons
+  --button-gradient: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  --button-gradient-hover: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 100%);
+
+  // Cards
+  --card-padding: var(--spacing-md);
+  --card-gap: var(--spacing-md);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOW POWER MODE OVERRIDES
+// Reduces visual effects for performance
+// ─────────────────────────────────────────────────────────────────────────────
+[data-low-power='true'] {
+  --glass-blur: 0px;
+  --glass-blur-heavy: 0px;
+  --glass-bg: rgba(26, 26, 46, 0.9);
+  --glass-dark-bg: rgba(0, 0, 0, 0.8);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REDUCED MOTION PREFERENCES
+// ─────────────────────────────────────────────────────────────────────────────
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-normal: 0ms;
+    --transition-slow: 0ms;
+    --transition-spring: 0ms;
+  }
+}

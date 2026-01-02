@@ -11,7 +11,19 @@
       "Bash(git remote set-url:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm i:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx vite build)",
+      "Bash(cat:*)",
+      "Skill(document-skills:webapp-testing)",
+      "Bash(python test_hazards.py:*)",
+      "Bash(pip install:*)",
+      "Bash(playwright install:*)",
+      "Bash(python -m playwright:*)",
+      "Bash(python:*)",
+      "Bash(git -C \"X:\\\\Voxel Odyssey\" log --oneline -20)",
+      "Bash(cd:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

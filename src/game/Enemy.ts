@@ -21,6 +21,17 @@ export interface EnemyConfig {
   scale: number;
 }
 
+/**
+ * Interface for instancing callbacks
+ * Used to communicate with the EnemyInstancing system
+ */
+export interface EnemyInstancingCallbacks {
+  onRegister: (id: string, position: THREE.Vector3, scale: number) => void;
+  onUnregister: (id: string) => void;
+  onTransformUpdate: (id: string, position: THREE.Vector3, rotation: number) => void;
+  onDamageFlash: (id: string, duration: number) => void;
+}
+
 const DEFAULT_MINION_CONFIG: EnemyConfig = {
   health: 1,
   speed: 5,
@@ -31,6 +42,9 @@ const DEFAULT_MINION_CONFIG: EnemyConfig = {
   color: 0xa855f7,
   scale: 0.6
 };
+
+// Global unique ID counter for enemy instances
+let enemyIdCounter = 0;
 
 export class Enemy {
   protected readonly mesh: THREE.Mesh;
@@ -55,6 +69,46 @@ export class Enemy {
   public onDeath?: (enemy: Enemy) => void;
   public onAttack?: (enemy: Enemy, targetPosition: THREE.Vector3) => void;
 
+  // Knockback visual feedback callback
+  public onKnockback?: (position: THREE.Vector3, direction: THREE.Vector3, force: number) => void;
+
+  // Terrain following
+  protected getTerrainHeight: ((x: number, z: number) => number) | null = null;
+
+  // Distance-based update throttling for performance optimization
+  private updateCounter = 0;
+
+  // Distance thresholds for update frequency (in units)
+  private static readonly NEAR_DISTANCE = 15;    // Full updates every frame
+  private static readonly MID_DISTANCE = 30;     // Updates every 2 frames
+  private static readonly FAR_DISTANCE = 50;     // Updates every 4 frames
+
+  // Frustum culling optimization
+  private isVisible = true;
+  private visibilityCheckFrame = 0;
+  private static readonly VISIBILITY_CHECK_INTERVAL = 3; // Check every 3 frames
+  private static frameCounter = 0; // Shared frame counter across all enemies
+
+  // Physics body sleeping state for distant/idle enemies
+  private isSleeping = false;
+  private static readonly SLEEP_DISTANCE = 40;   // Put body to sleep beyond this distance
+
+  // Instancing support
+  private readonly instanceId: string;
+  private useInstancing = false;
+  private instancingCallbacks: EnemyInstancingCallbacks | null = null;
+  private readonly sceneRef: THREE.Scene;
+
+  // Cached vectors to avoid per-frame allocations
+  private readonly cachedPosition = new THREE.Vector3();
+  protected readonly tempDirection = new THREE.Vector3();
+
+  // Cached objects for optimization (avoid per-frame allocations)
+  private readonly cachedBoundingSphere = new THREE.Sphere();
+  private readonly cachedInstancePosition = new THREE.Vector3();
+  private readonly cachedInstanceColor = new THREE.Color();
+  private readonly cachedKnockbackDir = new THREE.Vector3();
+
   constructor(
     scene: THREE.Scene,
     physicsWorld: CANNON.World,
@@ -63,6 +117,10 @@ export class Enemy {
   ) {
     this.config = { ...DEFAULT_MINION_CONFIG, ...config };
     this.patrolCenter = spawnPosition.clone();
+    this.sceneRef = scene;
+
+    // Generate unique instance ID
+    this.instanceId = `enemy_${enemyIdCounter++}`;
 
     // Create mesh (purple orb)
     const geometry = new THREE.SphereGeometry(0.5 * this.config.scale, 12, 12);
@@ -78,8 +136,9 @@ export class Enemy {
     this.mesh.castShadow = true;
     scene.add(this.mesh);
 
-    // Create physics body
-    const shape = new CANNON.Sphere(0.5 * this.config.scale);
+    // Create physics body - ensure minimum collision radius of 0.4 for reliable hit detection
+    const collisionRadius = Math.max(0.4, 0.5 * this.config.scale);
+    const shape = new CANNON.Sphere(collisionRadius);
     this.body = new CANNON.Body({
       mass: 0.5,
       shape,
@@ -100,10 +159,19 @@ export class Enemy {
     if (this.state === EnemyState.DEAD) return;
 
     this.animationTime += delta;
+    this.updateCounter++;
+
+    // Calculate distance to player for update frequency
+    const distanceToPlayer = this.getPosition().distanceTo(playerPosition);
+
+    // Determine update frequency based on distance
+    const updateInterval = this.getUpdateInterval(distanceToPlayer);
+
+    // Always do minimal updates (visual sync, timers)
     this.attackCooldown = Math.max(0, this.attackCooldown - delta);
     this.healthSystem.update(delta);
 
-    // Floating animation
+    // Floating animation (always runs for visual consistency)
     const floatOffset = Math.sin(this.animationTime * 3) * 0.2;
     this.mesh.position.y = this.body.position.y + floatOffset;
 
@@ -118,27 +186,60 @@ export class Enemy {
       }
     }
 
-    // AI state machine
-    const distanceToPlayer = this.getPosition().distanceTo(playerPosition);
+    // Full AI update only on appropriate frames (throttled for distant enemies)
+    if (this.updateCounter % updateInterval === 0) {
+      // AI state machine
+      switch (this.state) {
+        case EnemyState.IDLE:
+          this.updateIdle(distanceToPlayer);
+          break;
+        case EnemyState.PATROL:
+          this.updatePatrol(delta * updateInterval, distanceToPlayer);
+          break;
+        case EnemyState.CHASE:
+          this.updateChase(delta * updateInterval, playerPosition, distanceToPlayer);
+          break;
+        case EnemyState.ATTACK:
+          this.updateAttack(playerPosition, distanceToPlayer);
+          break;
+      }
 
-    switch (this.state) {
-      case EnemyState.IDLE:
-        this.updateIdle(distanceToPlayer);
-        break;
-      case EnemyState.PATROL:
-        this.updatePatrol(delta, distanceToPlayer);
-        break;
-      case EnemyState.CHASE:
-        this.updateChase(delta, playerPosition, distanceToPlayer);
-        break;
-      case EnemyState.ATTACK:
-        this.updateAttack(playerPosition, distanceToPlayer);
-        break;
+      // Follow terrain height
+      if (this.getTerrainHeight) {
+        const terrainY = this.getTerrainHeight(this.body.position.x, this.body.position.z) + 1;
+        if (this.body.position.y < terrainY) {
+          this.body.position.y = terrainY;
+          if (this.body.velocity.y < 0) {
+            this.body.velocity.y = 0;
+          }
+        }
+      }
     }
 
-    // Sync mesh with physics (except Y which has float offset)
+    // Always sync mesh with physics (except Y which has float offset)
     this.mesh.position.x = this.body.position.x;
     this.mesh.position.z = this.body.position.z;
+
+    // Update instancing system if enabled
+    if (this.useInstancing && this.instancingCallbacks) {
+      const pos = new THREE.Vector3(
+        this.body.position.x,
+        this.body.position.y + floatOffset,
+        this.body.position.z
+      );
+      this.instancingCallbacks.onTransformUpdate(this.instanceId, pos, 0);
+    }
+  }
+
+  /**
+   * Get update interval based on distance to player
+   * Closer enemies update every frame, distant ones less often
+   */
+  private getUpdateInterval(distance: number): number {
+    if (distance < Enemy.NEAR_DISTANCE) return 1;  // Every frame
+    if (distance < Enemy.MID_DISTANCE) return 2;   // Every 2 frames
+    if (distance < Enemy.FAR_DISTANCE) return 4;   // Every 4 frames
+    return 6; // Very far: every 6 frames
   }
 
   protected updateIdle(distanceToPlayer: number): void {
@@ -161,19 +262,19 @@ export class Enemy {
       return;
     }
 
-    const toTarget = new THREE.Vector3()
-      .subVectors(this.patrolTarget, this.getPosition());
-    toTarget.y = 0;
+    // Reuse tempDirection to avoid per-frame allocation
+    this.tempDirection.subVectors(this.patrolTarget, this.getPosition());
+    this.tempDirection.y = 0;
 
-    if (toTarget.length() < 1) {
+    if (this.tempDirection.length() < 1) {
       this.state = EnemyState.IDLE;
       this.patrolTarget = null;
       return;
     }
 
-    toTarget.normalize();
-    this.body.velocity.x = toTarget.x * this.config.speed * 0.5;
-    this.body.velocity.z = toTarget.z * this.config.speed * 0.5;
+    this.tempDirection.normalize();
+    this.body.velocity.x = this.tempDirection.x * this.config.speed * 0.5;
+    this.body.velocity.z = this.tempDirection.z * this.config.speed * 0.5;
   }
 
   protected updateChase(_delta: number, playerPosition: THREE.Vector3, distanceToPlayer: number): void {
@@ -187,14 +288,13 @@ export class Enemy {
       return;
     }
 
-    // Move toward player
-    const toPlayer = new THREE.Vector3()
-      .subVectors(playerPosition, this.getPosition());
-    toPlayer.y = 0;
-    toPlayer.normalize();
+    // Move toward player - reuse tempDirection
+    this.tempDirection.subVectors(playerPosition, this.getPosition());
+    this.tempDirection.y = 0;
+    this.tempDirection.normalize();
 
-    this.body.velocity.x = toPlayer.x * this.config.speed;
-    this.body.velocity.z = toPlayer.z * this.config.speed;
+    this.body.velocity.x = this.tempDirection.x * this.config.speed;
+    this.body.velocity.z = this.tempDirection.z * this.config.speed;
   }
 
   protected updateAttack(playerPosition: THREE.Vector3, distanceToPlayer: number): void {
@@ -231,13 +331,32 @@ export class Enemy {
     );
   }
 
-  takeDamage(amount: number = 1): boolean {
+  /**
+   * Apply damage with optional knockback effect.
+   * @param amount Damage amount
+   * @param knockbackSource Optional position to knock back from (e.g., projectile origin)
+   * @param knockbackForce Optional force multiplier (default 5)
+   */
+  takeDamage(amount: number = 1, knockbackSource?: THREE.Vector3, knockbackForce: number = 5): boolean {
     if (this.state === EnemyState.DEAD) return false;
+
+    // Wake up the physics body when taking damage (ensures physics response)
+    this.wakeUp();
 
     const damaged = this.healthSystem.takeDamage(amount);
 
     if (damaged) {
       this.damageFlashTime = 0.3;
+
+      // Apply knockback if source provided
+      if (knockbackSource) {
+        this.applyKnockback(knockbackSource, knockbackForce);
+      }
+
+      // Notify instancing system of damage flash
+      if (this.useInstancing && this.instancingCallbacks) {
+        this.instancingCallbacks.onDamageFlash(this.instanceId, 0.3);
+      }
 
       if (this.healthSystem.isDead()) {
         this.die();
@@ -245,6 +364,27 @@ export class Enemy {
     }
 
     return damaged;
+  }
+
+  /**
+   * Apply knockback impulse away from a source position.
+   * Triggers onKnockback callback for visual feedback (particles, screen shake).
+   */
+  private applyKnockback(source: THREE.Vector3, force: number): void {
+    // Calculate knockback direction (away from source)
+    this.cachedKnockbackDir.subVectors(this.getPosition(), source);
+    this.cachedKnockbackDir.y = 0.3; // Slight upward arc
+    this.cachedKnockbackDir.normalize();
+
+    // Apply impulse to physics body
+    this.body.velocity.x += this.cachedKnockbackDir.x * force;
+    this.body.velocity.y += this.cachedKnockbackDir.y * force * 0.5;
+    this.body.velocity.z += this.cachedKnockbackDir.z * force;
+
+    // Trigger callback for visual effects
+    if (this.onKnockback) {
+      this.onKnockback(this.getPosition(), this.cachedKnockbackDir, force);
+    }
   }
 
   protected die(): void {
@@ -257,11 +397,17 @@ export class Enemy {
   }
 
   getPosition(): THREE.Vector3 {
-    return new THREE.Vector3(
+    // Reuse cached position to avoid per-frame allocations
+    this.cachedPosition.set(
       this.body.position.x,
       this.body.position.y,
       this.body.position.z
     );
+    return this.cachedPosition;
+  }
+
+  setTerrainHeightGetter(getter: (x: number, z: number) => number): void {
+    this.getTerrainHeight = getter;
   }
 
   getMesh(): THREE.Mesh {
@@ -280,15 +426,216 @@ export class Enemy {
     return this.state === EnemyState.DEAD;
   }
 
+  /**
+   * Update visibility based on camera frustum.
+   * Uses cached result to avoid recalculating every frame.
+   * @param frustum - Pre-computed camera frustum from Game.ts
+   */
+  updateVisibility(frustum: THREE.Frustum): void {
+    // Only recalculate visibility every N frames for performance
+    if (Enemy.frameCounter !== this.visibilityCheckFrame) {
+      this.visibilityCheckFrame = Enemy.frameCounter;
+
+      // Reuse cached bounding sphere to avoid per-frame allocations
+      this.cachedBoundingSphere.center.copy(this.mesh.position);
+      this.cachedBoundingSphere.radius = 1.5 * this.config.scale;
+      this.isVisible = frustum.intersectsSphere(this.cachedBoundingSphere);
+    }
+
+    // Apply visibility to mesh (skip rendering when outside frustum)
+    this.mesh.visible = this.isVisible;
+  }
+
+  /**
+   * Increment the shared frame counter for visibility checks.
+   * Call this once per frame from Game.ts before updating enemies.
+   */
+  static incrementFrameCounter(): void {
+    Enemy.frameCounter = (Enemy.frameCounter + 1) % Enemy.VISIBILITY_CHECK_INTERVAL;
+  }
+
+  /**
+   * Get current visibility state (for debugging or conditional logic)
+   */
+  getIsVisible(): boolean {
+    return this.isVisible;
+  }
+
+  /**
+   * Put the enemy's physics body to sleep for performance.
+   * Sleeping bodies skip physics simulation but still render.
+   * Should be called when enemy is far from player or idle.
+   */
+  sleep(): void {
+    if (!this.isSleeping && this.state !== EnemyState.DEAD) {
+      this.body.sleep();
+      this.isSleeping = true;
+    }
+  }
+
+  /**
+   * Wake up the enemy's physics body to resume physics simulation.
+   * Should be called when enemy enters detection range or takes damage.
+   */
+  wakeUp(): void {
+    if (this.isSleeping) {
+      this.body.wakeUp();
+      this.isSleeping = false;
+    }
+  }
+
+  /**
+   * Check if the enemy's physics body is currently sleeping
+   */
+  getIsSleeping(): boolean {
+    return this.isSleeping;
+  }
+
+  /**
+   * Get the distance threshold for putting bodies to sleep
+   */
+  static getSleepDistance(): number {
+    return Enemy.SLEEP_DISTANCE;
+  }
+
+  /**
+   * Update sleep state based on distance to player.
+   * Called by Game.ts to manage physics body sleeping.
+   * @param distanceToPlayer Distance from enemy to player
+   */
+  updateSleepState(distanceToPlayer: number): void {
+    // Don't manage sleep for dead enemies
+    if (this.state === EnemyState.DEAD) return;
+
+    // Wake up if within detection range (needs to be able to respond)
+    if (distanceToPlayer < this.config.detectionRange) {
+      this.wakeUp();
+      return;
+    }
+
+    // Put to sleep if far from player and not actively chasing/attacking
+    if (distanceToPlayer > Enemy.SLEEP_DISTANCE) {
+      if (this.state === EnemyState.IDLE || this.state === EnemyState.PATROL) {
+        this.sleep();
+      }
+    }
+  }
+
   getDamage(): number {
     return this.config.damage;
+  }
+
+  getHealth(): number {
+    return this.healthSystem.getHealth();
+  }
+
+  getMaxHealth(): number {
+    return this.healthSystem.getMaxHealth();
   }
 
   heal(amount: number): void {
     this.healthSystem.heal(amount);
   }
 
+  /**
+   * Get the unique instance ID for this enemy
+   */
+  getInstanceId(): string {
+    return this.instanceId;
+  }
+
+  /**
+   * Check if this enemy type supports instanced rendering.
+   * Override in subclasses that don't support instancing (e.g., specialized geometry).
+   */
+  supportsInstancing(): boolean {
+    return true; // Base Enemy class supports instancing
+  }
+
+  /**
+   * Enable or disable instanced rendering for this enemy.
+   * When enabled, the individual mesh is hidden and the instancing system
+   * handles rendering via InstancedMesh.
+   */
+  setUseInstancing(enabled: boolean, callbacks?: EnemyInstancingCallbacks): void {
+    if (!this.supportsInstancing() && enabled) {
+      console.warn(`Enemy ${this.instanceId} does not support instancing`);
+      return;
+    }
+
+    const wasInstancing = this.useInstancing;
+    this.useInstancing = enabled;
+    this.instancingCallbacks = callbacks ?? null;
+
+    if (enabled && !wasInstancing && callbacks) {
+      // Register with instancing system
+      callbacks.onRegister(this.instanceId, this.getPosition(), this.config.scale);
+      // Hide individual mesh
+      this.mesh.visible = false;
+      this.sceneRef.remove(this.mesh);
+    } else if (!enabled && wasInstancing && this.instancingCallbacks) {
+      // Unregister from instancing system
+      this.instancingCallbacks.onUnregister(this.instanceId);
+      // Show individual mesh
+      this.mesh.visible = true;
+      this.sceneRef.add(this.mesh);
+    }
+  }
+
+  /**
+   * Check if instanced rendering is currently enabled
+   */
+  isUsingInstancing(): boolean {
+    return this.useInstancing;
+  }
+
+  /**
+   * Get the current transform data for instancing.
+   * Returns position and rotation for the instancing system.
+   * Uses cached Vector3 to avoid per-frame allocations.
+   */
+  getInstanceMatrix(): { position: THREE.Vector3; rotation: number; scale: number } {
+    const floatOffset = Math.sin(this.animationTime * 3) * 0.2;
+    this.cachedInstancePosition.set(
+      this.body.position.x,
+      this.body.position.y + floatOffset,
+      this.body.position.z
+    );
+    return {
+      position: this.cachedInstancePosition,
+      rotation: 0, // Basic enemies don't rotate
+      scale: this.config.scale
+    };
+  }
+
+  /**
+   * Get the current color for instancing (for damage flash).
+   * Returns the color based on damage flash state.
+   * Uses cached Color to avoid per-frame allocations.
+   */
+  getInstanceColor(): THREE.Color {
+    if (this.damageFlashTime > 0) {
+      const flash = Math.sin(this.damageFlashTime * 30) > 0;
+      this.cachedInstanceColor.setHex(flash ? 0xff0000 : this.config.color);
+    } else {
+      this.cachedInstanceColor.setHex(this.config.color);
+    }
+    return this.cachedInstanceColor;
+  }
+
+  /**
+   * Get the enemy's configuration scale
+   */
+  getScale(): number {
+    return this.config.scale;
+  }
+
   dispose(scene: THREE.Scene, physicsWorld: CANNON.World): void {
+    // Unregister from instancing system if enabled
+    if (this.useInstancing && this.instancingCallbacks) {
+      this.instancingCallbacks.onUnregister(this.instanceId);
+    }
+
     scene.remove(this.mesh);
     this.mesh.geometry.dispose();
     this.material.dispose();
@@ -332,6 +679,9 @@ export class Shooter extends Enemy {
   public onShoot?: (origin: THREE.Vector3, direction: THREE.Vector3, speed: number, damage: number) => void;
   private readonly projectileSpeed = 15;
 
+  // Cached direction vector to avoid per-attack allocations
+  private readonly cachedShootDir = new THREE.Vector3();
+
   constructor(
     scene: THREE.Scene,
     physicsWorld: CANNON.World,
@@ -350,6 +700,11 @@ export class Shooter extends Enemy {
 
     // Add spikes to shooter mesh to differentiate
     this.addSpikes(scene);
+  }
+
+  // Shooter has unique geometry (spikes), so it doesn't support instancing
+  override supportsInstancing(): boolean {
+    return false;
   }
 
   private addSpikes(_scene: THREE.Scene): void {
@@ -378,13 +733,13 @@ export class Shooter extends Enemy {
   protected override updateChase(_delta: number, playerPosition: THREE.Vector3, distanceToPlayer: number): void {
     // Shooter tries to maintain distance - backs up if too close
     if (distanceToPlayer < this.config.attackRange * 0.5) {
-      const awayFromPlayer = new THREE.Vector3()
-        .subVectors(this.getPosition(), playerPosition);
-      awayFromPlayer.y = 0;
-      awayFromPlayer.normalize();
+      // Reuse inherited tempDirection
+      this.tempDirection.subVectors(this.getPosition(), playerPosition);
+      this.tempDirection.y = 0;
+      this.tempDirection.normalize();
 
-      this.body.velocity.x = awayFromPlayer.x * this.config.speed;
-      this.body.velocity.z = awayFromPlayer.z * this.config.speed;
+      this.body.velocity.x = this.tempDirection.x * this.config.speed;
+      this.body.velocity.z = this.tempDirection.z * this.config.speed;
       return;
     }
 
@@ -398,27 +753,28 @@ export class Shooter extends Enemy {
       return;
     }
 
-    // Move toward player but slowly
-    const toPlayer = new THREE.Vector3()
-      .subVectors(playerPosition, this.getPosition());
-    toPlayer.y = 0;
-    toPlayer.normalize();
+    // Move toward player - reuse inherited tempDirection
+    this.tempDirection.subVectors(playerPosition, this.getPosition());
+    this.tempDirection.y = 0;
+    this.tempDirection.normalize();
 
-    this.body.velocity.x = toPlayer.x * this.config.speed;
-    this.body.velocity.z = toPlayer.z * this.config.speed;
+    this.body.velocity.x = this.tempDirection.x * this.config.speed;
+    this.body.velocity.z = this.tempDirection.z * this.config.speed;
   }
 
   protected override performAttack(targetPosition: THREE.Vector3): void {
     if (this.onShoot) {
-      const direction = new THREE.Vector3()
+      // Reuse cached direction vector to avoid per-attack allocations
+      this.cachedShootDir
         .subVectors(targetPosition, this.getPosition())
         .normalize();
-      // Add slight inaccuracy
-      direction.x += (Math.random() - 0.5) * 0.1;
-      direction.z += (Math.random() - 0.5) * 0.1;
-      direction.normalize();
 
-      this.onShoot(this.getPosition(), direction, this.projectileSpeed, this.config.damage);
+      // Add slight inaccuracy
+      this.cachedShootDir.x += (Math.random() - 0.5) * 0.1;
+      this.cachedShootDir.z += (Math.random() - 0.5) * 0.1;
+      this.cachedShootDir.normalize();
+
+      this.onShoot(this.getPosition(), this.cachedShootDir, this.projectileSpeed, this.config.damage);
     }
   }
 }
@@ -428,6 +784,9 @@ export class Tank extends Enemy {
   private chargeTimer = 0;
   private isCharging = false;
   private chargeDirection = new THREE.Vector3();
+
+  // Callback for visual feedback when charge starts
+  public onChargeStart?: (startPos: THREE.Vector3, endPos: THREE.Vector3) => void;
 
   constructor(
     scene: THREE.Scene,
@@ -452,6 +811,11 @@ export class Tank extends Enemy {
       0.8 * this.config.scale,
       1 * this.config.scale
     );
+  }
+
+  // Tank has unique geometry (box), so it doesn't support instancing
+  override supportsInstancing(): boolean {
+    return false;
   }
 
   override update(delta: number, playerPosition: THREE.Vector3): void {
@@ -479,12 +843,21 @@ export class Tank extends Enemy {
 
   protected override performAttack(targetPosition: THREE.Vector3): void {
     // Start a charge attack
-    this.chargeDirection.subVectors(targetPosition, this.getPosition());
+    const startPos = this.getPosition();
+    this.chargeDirection.subVectors(targetPosition, startPos);
     this.chargeDirection.y = 0;
     this.chargeDirection.normalize();
 
     this.isCharging = true;
     this.chargeTimer = 0.5; // Charge for 0.5 seconds
+
+    // Notify visual system of charge
+    if (this.onChargeStart) {
+      const endPos = startPos.clone().add(
+        this.chargeDirection.clone().multiplyScalar(this.config.speed * 4 * 0.5)
+      );
+      this.onChargeStart(startPos, endPos);
+    }
 
     super.performAttack(targetPosition);
   }
@@ -516,18 +889,22 @@ export class Speeder extends Enemy {
     this.mesh.geometry = new THREE.CapsuleGeometry(0.2, 0.5, 4, 8);
   }
 
+  // Speeder has unique geometry (capsule), so it doesn't support instancing
+  override supportsInstancing(): boolean {
+    return false;
+  }
+
   override update(delta: number, playerPosition: THREE.Vector3): void {
     if (this.isRetreating) {
       this.retreatTimer -= delta;
 
-      // Retreat away from player
-      const awayFromPlayer = new THREE.Vector3()
-        .subVectors(this.getPosition(), playerPosition);
-      awayFromPlayer.y = 0;
-      awayFromPlayer.normalize();
+      // Retreat away from player - reuse inherited tempDirection
+      this.tempDirection.subVectors(this.getPosition(), playerPosition);
+      this.tempDirection.y = 0;
+      this.tempDirection.normalize();
 
-      this.body.velocity.x = awayFromPlayer.x * this.config.speed;
-      this.body.velocity.z = awayFromPlayer.z * this.config.speed;
+      this.body.velocity.x = this.tempDirection.x * this.config.speed;
+      this.body.velocity.z = this.tempDirection.z * this.config.speed;
 
       if (this.retreatTimer <= 0) {
         this.isRetreating = false;
@@ -539,16 +916,16 @@ export class Speeder extends Enemy {
       this.mesh.position.z = this.body.position.z;
 
       // Face movement direction
-      this.mesh.rotation.y = Math.atan2(awayFromPlayer.x, awayFromPlayer.z);
+      this.mesh.rotation.y = Math.atan2(this.tempDirection.x, this.tempDirection.z);
       return;
     }
 
     super.update(delta, playerPosition);
 
-    // Face player when chasing
+    // Face player when chasing - reuse inherited tempDirection
     if (this.state === EnemyState.CHASE) {
-      const toPlayer = new THREE.Vector3().subVectors(playerPosition, this.getPosition());
-      this.mesh.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+      this.tempDirection.subVectors(playerPosition, this.getPosition());
+      this.mesh.rotation.y = Math.atan2(this.tempDirection.x, this.tempDirection.z);
     }
   }
 
@@ -569,6 +946,9 @@ export class Healer extends Enemy {
 
   // Store reference to find other enemies
   private readonly allEnemies: () => Enemy[];
+
+  // Cached vector to avoid per-frame allocations
+  private readonly cachedAwayDir = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -593,6 +973,11 @@ export class Healer extends Enemy {
     this.addHealingRing(scene);
   }
 
+  // Healer has unique visuals (healing ring), so it doesn't support instancing
+  override supportsInstancing(): boolean {
+    return false;
+  }
+
   private addHealingRing(_scene: THREE.Scene): void {
     const ringGeometry = new THREE.TorusGeometry(0.5, 0.05, 8, 16);
     const ringMaterial = new THREE.MeshStandardMaterial({
@@ -611,13 +996,13 @@ export class Healer extends Enemy {
   protected override updateChase(_delta: number, playerPosition: THREE.Vector3, distanceToPlayer: number): void {
     // Healer tries to stay away from player
     if (distanceToPlayer < 8) {
-      const awayFromPlayer = new THREE.Vector3()
-        .subVectors(this.getPosition(), playerPosition);
-      awayFromPlayer.y = 0;
-      awayFromPlayer.normalize();
+      // Reuse cached vector to avoid per-frame allocations
+      this.cachedAwayDir.subVectors(this.getPosition(), playerPosition);
+      this.cachedAwayDir.y = 0;
+      this.cachedAwayDir.normalize();
 
-      this.body.velocity.x = awayFromPlayer.x * this.config.speed;
-      this.body.velocity.z = awayFromPlayer.z * this.config.speed;
+      this.body.velocity.x = this.cachedAwayDir.x * this.config.speed;
+      this.body.velocity.z = this.cachedAwayDir.z * this.config.speed;
     } else {
       // Stay near other enemies
       this.body.velocity.x *= 0.9;
@@ -660,6 +1045,9 @@ export class Shielder extends Enemy {
   private readonly shieldRegenDelay = 5;
   private shieldMesh: THREE.Mesh;
 
+  // Callback for visual feedback when shield absorbs damage
+  public onShieldAbsorb?: (position: THREE.Vector3) => void;
+
   constructor(
     scene: THREE.Scene,
     physicsWorld: CANNON.World,
@@ -693,6 +1081,11 @@ export class Shielder extends Enemy {
     this.mesh.add(this.shieldMesh);
   }
 
+  // Shielder has unique visuals (shield mesh), so it doesn't support instancing
+  override supportsInstancing(): boolean {
+    return false;
+  }
+
   override update(delta: number, playerPosition: THREE.Vector3): void {
     super.update(delta, playerPosition);
 
@@ -720,6 +1113,11 @@ export class Shielder extends Enemy {
       this.shield -= amount;
       this.shieldRegenTimer = 0; // Reset regen timer on hit
       this.damageFlashTime = 0.2;
+
+      // Notify visual system of shield absorb
+      if (this.onShieldAbsorb) {
+        this.onShieldAbsorb(this.getPosition());
+      }
 
       if (this.shield < 0) {
         // Overflow damage goes to health

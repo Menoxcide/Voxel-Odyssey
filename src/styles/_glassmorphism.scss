@@ -1,0 +1,358 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// VOXEL ODYSSEY - GLASSMORPHISM SYSTEM
+// Reusable mixins and classes for frosted glass UI effects
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE MIXINS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Base glass panel effect with blur and border
+@mixin glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+/// Glass panel with hover state
+@mixin glass-panel-interactive {
+  @include glass-panel;
+  transition: background var(--transition-fast),
+              border-color var(--transition-fast),
+              box-shadow var(--transition-fast),
+              transform var(--transition-fast);
+
+  &:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  &:active {
+    background: var(--glass-bg-active);
+    transform: scale(0.98);
+  }
+}
+
+/// Dark glass variant (higher contrast)
+@mixin glass-panel-dark {
+  background: var(--glass-dark-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-dark-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+/// Heavy blur glass (for overlays/modals)
+@mixin glass-overlay {
+  background: rgba(26, 26, 46, 0.8);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+}
+
+/// Glass button styling
+@mixin glass-button {
+  @include glass-panel-interactive;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  user-select: none;
+  text-shadow: var(--shadow-text);
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+}
+
+/// Glass button with gradient accent
+@mixin glass-button-primary {
+  @include glass-button;
+  background: var(--button-gradient);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-glow-primary);
+
+  &:hover:not(:disabled) {
+    background: var(--button-gradient-hover);
+    box-shadow: var(--shadow-glow-primary), var(--shadow-card-hover);
+  }
+}
+
+/// Glass card for class selection, etc.
+@mixin glass-card {
+  @include glass-panel-interactive;
+  padding: var(--card-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/// Glass card with colored border accent
+@mixin glass-card-accent($color) {
+  @include glass-card;
+  border-color: $color;
+  box-shadow: 0 0 15px rgba($color, 0.2), var(--shadow-card);
+
+  &:hover {
+    border-color: $color;
+    box-shadow: 0 0 25px rgba($color, 0.4), var(--shadow-card-hover);
+  }
+}
+
+/// Glass input field
+@mixin glass-input {
+  @include glass-panel;
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-md);
+  outline: none;
+  transition: border-color var(--transition-fast),
+              box-shadow var(--transition-fast);
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
+  }
+}
+
+/// Glass slider track
+@mixin glass-slider-track {
+  @include glass-panel;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+/// Glass slider thumb
+@mixin glass-slider-thumb {
+  width: 20px;
+  height: 20px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-text-primary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: var(--shadow-glow-primary);
+  transition: transform var(--transition-fast);
+
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITY CLASSES
+// ─────────────────────────────────────────────────────────────────────────────
+
+.glass-panel {
+  @include glass-panel;
+}
+
+.glass-panel-dark {
+  @include glass-panel-dark;
+}
+
+.glass-button {
+  @include glass-button;
+}
+
+.glass-button-primary {
+  @include glass-button-primary;
+}
+
+.glass-card {
+  @include glass-card;
+}
+
+.glass-overlay {
+  @include glass-overlay;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLASS-SPECIFIC CARD VARIANTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+.glass-card--mage {
+  @include glass-card-accent(#4a90e2);
+}
+
+.glass-card--warrior {
+  @include glass-card-accent(#dc2626);
+}
+
+.glass-card--ranger {
+  @include glass-card-accent(#22c55e);
+}
+
+.glass-card--healer {
+  @include glass-card-accent(#fbbf24);
+}
+
+.glass-card--locked {
+  @include glass-card;
+  opacity: 0.6;
+  filter: grayscale(0.5);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(0, 0, 0, 0.1) 10px,
+      rgba(0, 0, 0, 0.1) 20px
+    );
+    border-radius: inherit;
+    pointer-events: none;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HUD GLASS COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+.glass-hud {
+  @include glass-panel;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  pointer-events: none;
+}
+
+.glass-health-container {
+  @include glass-panel-dark;
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.glass-health-fill {
+  height: 100%;
+  background: var(--boss-bar-gradient);
+  border-radius: var(--radius-md);
+  transition: width var(--transition-normal);
+}
+
+.glass-cooldown {
+  @include glass-panel;
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(
+      var(--color-primary) var(--cooldown-progress, 0%),
+      transparent var(--cooldown-progress, 0%)
+    );
+    opacity: 0.3;
+  }
+
+  &.ready {
+    border-color: var(--color-success);
+    box-shadow: var(--shadow-glow-success);
+  }
+
+  &.on-cooldown {
+    border-color: var(--color-text-muted);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MENU GLASS COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+.glass-menu {
+  @include glass-overlay;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.glass-menu-content {
+  @include glass-panel;
+  padding: var(--spacing-xl);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.glass-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--glass-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.glass-toggle {
+  position: relative;
+  width: 50px;
+  height: 28px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: var(--color-text-primary);
+    border-radius: var(--radius-full);
+    transition: transform var(--transition-fast);
+  }
+
+  &.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+
+    &::after {
+      transform: translateX(22px);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FALLBACK FOR NO BACKDROP-FILTER SUPPORT
+// ─────────────────────────────────────────────────────────────────────────────
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-panel,
+  .glass-panel-dark,
+  .glass-hud,
+  .glass-card,
+  .glass-menu,
+  .glass-menu-content,
+  .glass-overlay {
+    background: rgba(26, 26, 46, 0.95) !important;
+  }
+}

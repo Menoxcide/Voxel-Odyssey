@@ -47,6 +47,13 @@ export class Boss {
   // Animation
   private animationTime = 0;
 
+  // Cached vectors to avoid per-frame allocations
+  private readonly cachedPosition = new THREE.Vector3();
+  private readonly tempDirection = new THREE.Vector3();
+  private readonly tempVelocity = new THREE.Vector3();
+  private readonly cachedBeamDir = new THREE.Vector3();
+  private readonly cachedToPosition = new THREE.Vector3();
+
   // Callbacks
   public onSummonMinions?: (count: number, position: THREE.Vector3) => void;
   public onBeamUpdate?: (origin: THREE.Vector3, angle: number, length: number) => void;
@@ -54,6 +61,11 @@ export class Boss {
   public onDashHit?: (position: THREE.Vector3) => void;
   public onDeath?: () => void;
   public onPhaseChange?: (phase: BossPhase) => void;
+
+  // Attack telegraph callbacks - warn player before attacks land
+  public onBeamTelegraph?: (origin: THREE.Vector3, startAngle: number, sweepAngle: number) => void;
+  public onDashTelegraph?: (origin: THREE.Vector3, targetPos: THREE.Vector3) => void;
+  public onMeleeTelegraph?: (origin: THREE.Vector3, radius: number) => void;
 
   constructor(
     scene: THREE.Scene,
@@ -81,8 +93,9 @@ export class Boss {
 
     physicsWorld.addBody(this.body);
 
-    // Initialize health (10 HP for boss)
-    this.healthSystem = new HealthSystem(10, 0.3);
+    // Initialize health (15 HP for boss - ~5 HP per phase)
+    // With combo multipliers (up to 3x), this ensures each phase lasts ~5 hits minimum
+    this.healthSystem = new HealthSystem(15, 0.3);
   }
 
   update(delta: number, playerPosition: THREE.Vector3): void {
@@ -125,23 +138,22 @@ export class Boss {
       this.body.position.z
     );
 
-    // Face player
-    const toPlayer = new THREE.Vector3()
-      .subVectors(playerPosition, this.getPosition());
-    toPlayer.y = 0;
+    // Face player - reuse tempDirection
+    this.tempDirection.subVectors(playerPosition, this.getPosition());
+    this.tempDirection.y = 0;
 
-    if (toPlayer.lengthSq() > 0.1) {
-      const angle = Math.atan2(toPlayer.x, toPlayer.z);
+    if (this.tempDirection.lengthSq() > 0.1) {
+      const angle = Math.atan2(this.tempDirection.x, this.tempDirection.z);
       this.model.setRotation(angle);
     }
 
-    // Update animation
-    const velocity = new THREE.Vector3(
+    // Update animation - reuse tempVelocity
+    this.tempVelocity.set(
       this.body.velocity.x,
       this.body.velocity.y,
       this.body.velocity.z
     );
-    this.model.update(delta, velocity);
+    this.model.update(delta, this.tempVelocity);
   }
 
   private updatePhase(): void {
@@ -187,6 +199,11 @@ export class Boss {
           playerPosition.x - this.body.position.x,
           playerPosition.z - this.body.position.z
         ) - Math.PI / 4;
+
+        // Telegraph: warn player of incoming beam attack
+        if (this.onBeamTelegraph) {
+          this.onBeamTelegraph(this.getPosition(), this.beamAngle, Math.PI / 2);
+        }
         break;
 
       case BossPhase.RAGE:
@@ -197,9 +214,19 @@ export class Boss {
           this.dashDirection.y = 0;
           this.isDashing = true;
           this.stateTimer = 0.5;
+
+          // Telegraph: show dash trajectory
+          if (this.onDashTelegraph) {
+            this.onDashTelegraph(this.getPosition(), playerPosition);
+          }
         } else {
           this.state = BossState.MELEE_ATTACK;
           this.stateTimer = 0.5;
+
+          // Telegraph: show melee danger zone
+          if (this.onMeleeTelegraph) {
+            this.onMeleeTelegraph(this.getPosition(), 3);
+          }
         }
         break;
     }
@@ -262,15 +289,14 @@ export class Boss {
   }
 
   private updateRetreating(_delta: number): void {
-    // Move toward arena center
-    const toCenter = new THREE.Vector3()
-      .subVectors(this.arenaCenter, this.getPosition());
-    toCenter.y = 0;
+    // Move toward arena center - reuse tempDirection
+    this.tempDirection.subVectors(this.arenaCenter, this.getPosition());
+    this.tempDirection.y = 0;
 
-    if (toCenter.length() > 3) {
-      toCenter.normalize();
-      this.body.velocity.x = toCenter.x * this.baseSpeed;
-      this.body.velocity.z = toCenter.z * this.baseSpeed;
+    if (this.tempDirection.length() > 3) {
+      this.tempDirection.normalize();
+      this.body.velocity.x = this.tempDirection.x * this.baseSpeed;
+      this.body.velocity.z = this.tempDirection.z * this.baseSpeed;
     } else {
       this.body.velocity.x = 0;
       this.body.velocity.z = 0;
@@ -307,11 +333,13 @@ export class Boss {
   }
 
   getPosition(): THREE.Vector3 {
-    return new THREE.Vector3(
+    // Reuse cached position to avoid per-frame allocations
+    this.cachedPosition.set(
       this.body.position.x,
       this.body.position.y,
       this.body.position.z
     );
+    return this.cachedPosition;
   }
 
   getHealth(): number {
@@ -347,21 +375,23 @@ export class Boss {
     if (this.state !== BossState.BEAM_ATTACK) return false;
 
     const bossPos = this.getPosition();
-    const beamDir = new THREE.Vector3(
+
+    // Reuse cached vectors to avoid per-frame allocations
+    this.cachedBeamDir.set(
       Math.sin(this.beamAngle),
       0,
       Math.cos(this.beamAngle)
     );
 
     // Check if position is within beam
-    const toPosition = new THREE.Vector3().subVectors(position, bossPos);
-    toPosition.y = 0;
+    this.cachedToPosition.subVectors(position, bossPos);
+    this.cachedToPosition.y = 0;
 
-    const distance = toPosition.length();
+    const distance = this.cachedToPosition.length();
     if (distance > this.beamLength) return false;
 
-    toPosition.normalize();
-    const dot = toPosition.dot(beamDir);
+    this.cachedToPosition.normalize();
+    const dot = this.cachedToPosition.dot(this.cachedBeamDir);
 
     // Within ~20 degree cone
     return dot > 0.94;

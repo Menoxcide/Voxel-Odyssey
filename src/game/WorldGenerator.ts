@@ -214,12 +214,14 @@ export class WorldGenerator {
     const color = new THREE.Color();
 
     positions.forEach((pos, i) => {
-      // Trunk position
-      matrix.setPosition(pos.x, pos.height + 1.5, pos.z);
+      // Trunk position (raised to avoid Z-fighting with terrain voxels)
+      // Trunk is 3 units tall, centered, so bottom is at y - 1.5
+      // Placing at pos.height + 2.0 means bottom is at pos.height + 0.5 (above grass)
+      matrix.setPosition(pos.x, pos.height + 2.0, pos.z);
       trunks.setMatrixAt(i, matrix);
 
       // Leaves position (on top of trunk)
-      matrix.setPosition(pos.x, pos.height + 4, pos.z);
+      matrix.setPosition(pos.x, pos.height + 4.5, pos.z);
       leaves.setMatrixAt(i, matrix);
 
       // Slight color variation for leaves

@@ -73,6 +73,43 @@ export class AudioManager {
       gameOver: {
         src: ['/sounds/game_over.ogg', '/sounds/game_over.mp3'],
         volume: 0.6
+      },
+      criticalHit: {
+        src: ['/sounds/critical_hit.ogg', '/sounds/critical_hit.mp3'],
+        volume: 0.7,
+        pool: 3
+      },
+      pickup: {
+        src: ['/sounds/pickup.ogg', '/sounds/pickup.mp3'],
+        volume: 0.4,
+        pool: 3
+      },
+      shieldBreak: {
+        src: ['/sounds/shield_break.ogg', '/sounds/shield_break.mp3'],
+        volume: 0.6
+      },
+      // Combo tier sounds - escalating intensity
+      comboGood: {
+        src: ['/sounds/combo_good.ogg', '/sounds/combo_good.mp3'],
+        volume: 0.5
+      },
+      comboGreat: {
+        src: ['/sounds/combo_great.ogg', '/sounds/combo_great.mp3'],
+        volume: 0.6
+      },
+      comboAmazing: {
+        src: ['/sounds/combo_amazing.ogg', '/sounds/combo_amazing.mp3'],
+        volume: 0.7
+      },
+      comboLegendary: {
+        src: ['/sounds/combo_legendary.ogg', '/sounds/combo_legendary.mp3'],
+        volume: 0.8
+      },
+      // Kill streak announcements
+      killStreak: {
+        src: ['/sounds/kill_streak.ogg', '/sounds/kill_streak.mp3'],
+        volume: 0.7,
+        pool: 2
       }
     };
 

@@ -7,6 +7,12 @@ export interface InputState {
   aimY: number;
   shooting: boolean;
   jumping: boolean;
+  secondaryAbility: boolean;
+  targetScreenX?: number;
+  targetScreenY?: number;
+  cycleTarget: boolean;
+  clearTarget: boolean;
+  pause: boolean;
 }
 
 interface GyroState {
@@ -22,8 +28,18 @@ export class InputManager {
     aimX: 0,
     aimY: 0,
     shooting: false,
-    jumping: false
+    jumping: false,
+    secondaryAbility: false,
+    cycleTarget: false,
+    clearTarget: false,
+    pause: false
   };
+
+  // Input sanitization bounds
+  private static readonly MOVE_CLAMP = 1.0;
+  private static readonly AIM_X_MAX = Math.PI * 4; // Allow 2 full rotations
+  private static readonly AIM_Y_MIN = -Math.PI / 3;
+  private static readonly AIM_Y_MAX = Math.PI / 3;
 
   private joystick: JoystickManager | null = null;
   private readonly keys: Set<string> = new Set();
@@ -51,6 +67,29 @@ export class InputManager {
         e.preventDefault();
         this.state.jumping = true;
       }
+
+      // Secondary ability (E key or Q key)
+      if (e.code === 'KeyE' || e.code === 'KeyQ') {
+        e.preventDefault();
+        this.state.secondaryAbility = true;
+      }
+
+      // Target cycling (Tab key)
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        this.state.cycleTarget = true;
+      }
+
+      // Pause (Escape key)
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        this.state.pause = true;
+      }
+
+      // Clear target (X key)
+      if (e.code === 'KeyX') {
+        this.state.clearTarget = true;
+      }
     });
 
     window.addEventListener('keyup', (e: KeyboardEvent) => {
@@ -58,6 +97,22 @@ export class InputManager {
 
       if (e.code === 'Space') {
         this.state.jumping = false;
+      }
+
+      if (e.code === 'KeyE' || e.code === 'KeyQ') {
+        this.state.secondaryAbility = false;
+      }
+
+      if (e.code === 'Tab') {
+        this.state.cycleTarget = false;
+      }
+
+      if (e.code === 'Escape') {
+        this.state.pause = false;
+      }
+
+      if (e.code === 'KeyX') {
+        this.state.clearTarget = false;
       }
     });
   }
@@ -104,6 +159,7 @@ export class InputManager {
 
     const joystickZone = document.getElementById('joystick-zone');
     const shootBtn = document.getElementById('shoot-btn');
+    const abilityBtn = document.getElementById('ability-btn');
 
     if (joystickZone) {
       this.joystick = nipplejs.create({
@@ -166,14 +222,54 @@ export class InputManager {
       }, { passive: true });
     }
 
+    // Ability button for secondary ability
+    if (abilityBtn) {
+      let abilityTouchId: number | null = null;
+
+      abilityBtn.addEventListener('touchstart', (e: TouchEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          abilityTouchId = e.changedTouches[i].identifier;
+          this.state.secondaryAbility = true;
+          break;
+        }
+      }, { passive: false });
+
+      abilityBtn.addEventListener('touchend', (e: TouchEvent) => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === abilityTouchId) {
+            abilityTouchId = null;
+            this.state.secondaryAbility = false;
+            break;
+          }
+        }
+      }, { passive: false });
+
+      abilityBtn.addEventListener('touchcancel', (e: TouchEvent) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === abilityTouchId) {
+            abilityTouchId = null;
+            this.state.secondaryAbility = false;
+            break;
+          }
+        }
+      }, { passive: true });
+    }
+
     // Right side touch drag for camera rotation
     this.setupCameraTouchControl();
+
+    // Tap detection for targeting (anywhere on screen that's not a button)
+    this.setupTapTargeting();
   }
 
   private setupCameraTouchControl(): void {
     let lastTouchX = 0;
     let lastTouchY = 0;
     let cameraTouchId: number | null = null;
+    let isCameraTouchActive = false;
 
     // Use the canvas for camera touch on right side of screen
     this.canvas.addEventListener('touchstart', (e: TouchEvent) => {
@@ -187,13 +283,14 @@ export class InputManager {
           cameraTouchId = touch.identifier;
           lastTouchX = touch.clientX;
           lastTouchY = touch.clientY;
+          isCameraTouchActive = true;
           break;
         }
       }
     }, { passive: true });
 
     this.canvas.addEventListener('touchmove', (e: TouchEvent) => {
-      if (cameraTouchId === null) return;
+      if (cameraTouchId === null || !isCameraTouchActive) return;
 
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
@@ -223,6 +320,7 @@ export class InputManager {
       for (let i = 0; i < e.changedTouches.length; i++) {
         if (e.changedTouches[i].identifier === cameraTouchId) {
           cameraTouchId = null;
+          isCameraTouchActive = false;
           break;
         }
       }
@@ -230,6 +328,48 @@ export class InputManager {
 
     this.canvas.addEventListener('touchend', endCameraTouch, { passive: true });
     this.canvas.addEventListener('touchcancel', endCameraTouch, { passive: true });
+  }
+
+  private setupTapTargeting(): void {
+    let tapStartX = 0;
+    let tapStartY = 0;
+    let tapStartTime = 0;
+    const maxTapMovement = 20; // pixels
+    const maxTapDuration = 300; // ms
+
+    this.canvas.addEventListener('touchstart', (e: TouchEvent) => {
+      const touch = e.touches[0];
+      tapStartX = touch.clientX;
+      tapStartY = touch.clientY;
+      tapStartTime = Date.now();
+    }, { passive: true });
+
+    this.canvas.addEventListener('touchend', (e: TouchEvent) => {
+      if (e.changedTouches.length === 0) return;
+
+      const touch = e.changedTouches[0];
+      const tapEndX = touch.clientX;
+      const tapEndY = touch.clientY;
+      const tapDuration = Date.now() - tapStartTime;
+
+      // Check if it was a tap (not a drag)
+      const distance = Math.sqrt(
+        Math.pow(tapEndX - tapStartX, 2) +
+        Math.pow(tapEndY - tapStartY, 2)
+      );
+
+      if (distance < maxTapMovement && tapDuration < maxTapDuration) {
+        // It's a tap! Store the screen coordinates for targeting
+        this.state.targetScreenX = tapEndX;
+        this.state.targetScreenY = tapEndY;
+
+        // Clear after one frame
+        setTimeout(() => {
+          this.state.targetScreenX = undefined;
+          this.state.targetScreenY = undefined;
+        }, 100);
+      }
+    }, { passive: true });
   }
 
   async requestGyroPermission(): Promise<boolean> {
@@ -303,16 +443,63 @@ export class InputManager {
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) moveX -= 1;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) moveX += 1;
 
-    // Only override touch input if keyboard is active
-    if (moveX !== 0 || moveZ !== 0) {
+    // On desktop (non-touch), always use keyboard state
+    // On touch devices, only override if keyboard is active
+    if (!this.isTouchDevice()) {
+      // Desktop: always apply keyboard state (including 0,0 when no keys pressed)
+      if (moveX !== 0 || moveZ !== 0) {
+        const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+        this.state.moveX = moveX / length;
+        this.state.moveZ = moveZ / length;
+      } else {
+        this.state.moveX = 0;
+        this.state.moveZ = 0;
+      }
+    } else if (moveX !== 0 || moveZ !== 0) {
+      // Touch device with keyboard: only override when keys pressed
       const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
       this.state.moveX = moveX / length;
       this.state.moveZ = moveZ / length;
     }
+
+    // Camera aim values persist - they represent absolute rotation, not deltas
+    // Touch and mouse controls update them incrementally
   }
 
   getState(): Readonly<InputState> {
+    // Sanitize before returning
+    this.sanitizeInput();
     return this.state;
+  }
+
+  /**
+   * Sanitize input values to prevent:
+   * - NaN/Infinity values from corrupting game state
+   * - Out-of-bounds values that could cause unexpected behavior
+   * - Potential exploits through extreme input values
+   */
+  private sanitizeInput(): void {
+    // Clamp movement to [-1, 1]
+    this.state.moveX = this.clampSafe(this.state.moveX, -InputManager.MOVE_CLAMP, InputManager.MOVE_CLAMP);
+    this.state.moveZ = this.clampSafe(this.state.moveZ, -InputManager.MOVE_CLAMP, InputManager.MOVE_CLAMP);
+
+    // Wrap aim X to reasonable range (prevent accumulation over time)
+    if (Math.abs(this.state.aimX) > InputManager.AIM_X_MAX) {
+      this.state.aimX = this.state.aimX % (Math.PI * 2);
+    }
+
+    // Clamp aim Y to vertical look limits
+    this.state.aimY = this.clampSafe(this.state.aimY, InputManager.AIM_Y_MIN, InputManager.AIM_Y_MAX);
+  }
+
+  /**
+   * Safe clamp that handles NaN and Infinity
+   */
+  private clampSafe(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+    return Math.max(min, Math.min(max, value));
   }
 
   isGyroEnabled(): boolean {

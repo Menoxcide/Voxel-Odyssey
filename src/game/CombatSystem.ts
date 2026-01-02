@@ -23,12 +23,20 @@ export class PhysicsWorld {
   // Ground body
   private groundBody: CANNON.Body | null = null;
 
+  // Sleep configuration thresholds
+  private static readonly SLEEP_DISTANCE_THRESHOLD = 40; // Bodies beyond this distance can sleep
+  private static readonly SLEEP_VELOCITY_THRESHOLD = 0.1; // Bodies moving slower than this can auto-sleep
+  private static readonly SLEEP_TIME_THRESHOLD = 0.5; // Seconds of low velocity before auto-sleep
+
   constructor() {
     this.world = new CANNON.World();
     this.world.gravity.set(0, -20, 0);
 
     // Use SAPBroadphase for better performance
     this.world.broadphase = new CANNON.SAPBroadphase(this.world);
+
+    // Enable sleeping for performance optimization
+    this.world.allowSleep = true;
 
     // Default contact material
     const defaultMaterial = new CANNON.Material('default');
@@ -90,8 +98,45 @@ export class PhysicsWorld {
         COLLISION_GROUPS.PLAYER_PROJECTILE
     });
 
+    // Enable sleeping for this body with auto-sleep thresholds
+    body.allowSleep = true;
+    body.sleepSpeedLimit = PhysicsWorld.SLEEP_VELOCITY_THRESHOLD;
+    body.sleepTimeLimit = PhysicsWorld.SLEEP_TIME_THRESHOLD;
+
     this.world.addBody(body);
     return body;
+  }
+
+  /**
+   * Manually set the sleep state of a physics body.
+   * Sleeping bodies skip physics simulation for performance.
+   * @param body The cannon-es body to modify
+   * @param shouldSleep Whether the body should be put to sleep
+   */
+  setBodySleepState(body: CANNON.Body, shouldSleep: boolean): void {
+    if (shouldSleep) {
+      // Put body to sleep - stops physics simulation
+      body.sleep();
+    } else {
+      // Wake body up - resumes physics simulation
+      body.wakeUp();
+    }
+  }
+
+  /**
+   * Check if a body is currently sleeping
+   * @param body The cannon-es body to check
+   * @returns true if the body is sleeping
+   */
+  isBodySleeping(body: CANNON.Body): boolean {
+    return body.sleepState === CANNON.Body.SLEEPING;
+  }
+
+  /**
+   * Get the distance threshold for sleeping distant entities
+   */
+  static getSleepDistanceThreshold(): number {
+    return PhysicsWorld.SLEEP_DISTANCE_THRESHOLD;
   }
 
   step(delta: number): void {
@@ -137,6 +182,9 @@ export class ProjectileSystem {
   private readonly geometry: THREE.SphereGeometry;
   private readonly playerMaterial: THREE.MeshStandardMaterial;
   private readonly enemyMaterial: THREE.MeshStandardMaterial;
+
+  // Reusable scratch vectors to avoid allocations in hot path
+  private readonly scratchVelocity = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, physicsWorld: PhysicsWorld) {
     this.scene = scene;
@@ -228,9 +276,9 @@ export class ProjectileSystem {
     projectile.mesh.position.copy(origin);
     projectile.body.position.set(origin.x, origin.y, origin.z);
 
-    // Set velocity
-    const velocity = direction.clone().normalize().multiplyScalar(speed);
-    projectile.body.velocity.set(velocity.x, velocity.y, velocity.z);
+    // Set velocity (reuse scratch vector to avoid allocation)
+    this.scratchVelocity.copy(direction).normalize().multiplyScalar(speed);
+    projectile.body.velocity.set(this.scratchVelocity.x, this.scratchVelocity.y, this.scratchVelocity.z);
 
     // Update collision group
     projectile.body.collisionFilterGroup = isPlayer
